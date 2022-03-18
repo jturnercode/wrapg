@@ -14,8 +14,8 @@ import config
 # Inspired by dataset library that wraps sqlalchemy
 # ================================= TODO ================================
 # TODO: Can query() return explain analyse info?
-# TODO: Conditionally import config else initialize as {}
-# TODO: Implement copy function
+# TODO: Conditionally import config/env else initialize as {}
+# TODO: Implement copy function, update, delete
 # ===========================================================================
 
 conn_import: dict = {
@@ -134,6 +134,7 @@ def query(raw_sql: str, to_df=False, conn_kwargs: dict = None):
 def insert(data: list[dict] | pd.DataFrame, table: str, conn_kwargs: dict = None):
 
     """Function for SQL's INSERT
+
     Add a row(s) into specified table
 
     Args:
@@ -161,10 +162,9 @@ def insert(data: list[dict] | pd.DataFrame, table: str, conn_kwargs: dict = None
         with conn.cursor() as cur:
 
             # Typ insert statement format
-            # cur.execute("INSERT INTO table (col1, col2) VALUES (%s, %s)",
-            #  (300, "vehicles"))
+            # INSERT INTO table (col1, col2) VALUES (300, "vehicles");
 
-            # dynamic insert query for dictionaries
+            # Dynamic insert query for dictionaries
             # qry = sql.SQL("INSERT INTO {} ({}) VALUES ({})").format(
             #     sql.Identifier(table),
             #     sql.SQL(", ").join(map(sql.Identifier, columns)),
@@ -190,9 +190,10 @@ def insert_ignore(
     data: list[dict] | pd.DataFrame, table: str, keys: list, conn_kwargs: dict = None
 ):
     """Function for SQL's INSERT ON CONFLICT DO NOTHING
+
     Add a row into specified table if the row with specified keys does not already exist.
     If rows with matching keys exist no change is made.
-    Automatically creates unique constriant if one does not exist for keys provided.
+    Automatically creates unique index if one does not exist for keys provided.
 
     Args:
         data (list[dict] | pd.DataFrame): data in form of dict, list of dict, or dataframe
@@ -233,6 +234,7 @@ def insert_ignore(
                 sql.Identifier(table),
                 sql.SQL(", ").join(map(sql.Identifier, columns)),
                 sql.SQL(", ").join(sql.Placeholder() * len(columns)),
+                # this is technically known as 'conflict target'
                 sql.SQL(", ").join(map(sql.Identifier, keys)),
             )
             print(qry.as_string(conn))
@@ -246,25 +248,26 @@ def insert_ignore(
                 print("> Rolling back, attempt creation of new constriant...")
                 conn.rollback()
 
-                # Alter table and create new unique constriant & try again
+                # Create new unique index & try again
                 try:
-                    constraint_name = f'{table}_{"_".join(keys)}_idx'
-                    alter = sql.SQL(
-                        "ALTER TABLE {} ADD CONSTRAINT {} UNIQUE ({});"
-                    ).format(
+
+                    uix_name = f'{table}_{"_".join(keys)}_uix'
+                    uix_sql = sql.SQL("CREATE UNIQUE INDEX {} ON {} ({});").format(
+                        sql.Identifier(uix_name),
                         sql.Identifier(table),
-                        sql.Identifier(constraint_name),
                         sql.SQL(", ").join(map(sql.Identifier, keys)),
                     )
-                    # print(alter.as_string(conn))
+                    constraint_name = f'{table}_{"_".join(keys)}_idx'
 
-                    cur.execute(query=alter)
+                    # print(idx_sql.as_string(conn))
+
+                    cur.execute(query=uix_sql)
 
                     # Now execute previous insert_ignore statement
                     cur.executemany(query=qry, params_seq=rows)
 
-                except Exception as alter_error:
-                    print(">>> Error: ", alter_error)
+                except Exception as indx_error:
+                    print(">>> Error: ", indx_error)
                     quit()
 
             # Handle all other exceptions
@@ -279,10 +282,11 @@ def insert_ignore(
 def upsert(
     data: list[dict] | pd.DataFrame, table: str, keys: list, conn_kwargs: dict = None
 ):
-    """Function for SQL's INSERT ON CONFLICT DO UPDATE
+    """Function for SQL's INSERT ON CONFLICT DO UPDATE SET
+
     Add a row into specified table if the row with specified keys does not already exist.
     If rows with matching keys exist, update row values.
-    Automatically creates unique constriant if one does not exist for keys provided.
+    Automatically creates unique index if one does not exist for keys provided.
 
     Args:
         data (list[dict] | pd.DataFrame): data in form of dict, list of dict, or dataframe
@@ -311,11 +315,12 @@ def upsert(
         # Open a cursor to perform database operations
         with conn.cursor() as cur:
 
+            # Typical syntax
             # INSERT INTO table (name, email)
             # VALUES('Dave','dave@yahoo.com')
             # ON CONFLICT (name)
             # DO UPDATE SET email=excluded.email
-            # WHERE ;
+            # WHERE ...;
 
             # Function to compose col=excluded.col sql for update
             def set_str(cols: list):
@@ -334,47 +339,65 @@ def upsert(
                     )
                 return col_update
 
-            # =================== Ignore_Insert Qry ==================
+            # =================== Upsert Qry ==================
+            # TODO: add WHERE clause to upsert qry; Do i need it?
+            """
+            WHERE excluded.validDate>phonebook2.validDate;
+            sudo code fro add where
+            def sql_to_format()
+                if where:
+                    return sql.SQL(statement with where)
+                else:
+                    return sql.SQL(statement without where)
+            """
             qry = sql.SQL(
                 "INSERT INTO {} ({}) VALUES ({}) ON CONFLICT ({}) DO UPDATE SET {}"
             ).format(
                 sql.Identifier(table),
                 sql.SQL(", ").join(map(sql.Identifier, columns)),
                 sql.SQL(", ").join(sql.Placeholder() * len(columns)),
+                # this is technically known as 'conflict target'
                 sql.SQL(", ").join(map(sql.Identifier, keys)),
                 sql.SQL(", ").join(set_str(columns)),
-                # sql.SQL(set_str(columns)),
             )
-            print(qry.as_string(conn))
+            # print(qry.as_string(conn))
 
             try:
                 cur.executemany(query=qry, params_seq=rows)
 
-            # Catch no unique constriant error
+            # Catch no unique index error
             except errors.InvalidColumnReference as e:
                 print(">>> Error: ", e)
                 print("> Rolling back, attempt creation of new constriant...")
                 conn.rollback()
 
-                # Alter table and create new unique constriant & try again
+                # Add unique index & try again
                 try:
-                    constraint_name = f'{table}_{"_".join(keys)}_idx'
-                    alter = sql.SQL(
-                        "ALTER TABLE {} ADD CONSTRAINT {} UNIQUE ({});"
-                    ).format(
+                    uix_name = f'{table}_{"_".join(keys)}_uix'
+                    uix_sql = sql.SQL("CREATE UNIQUE INDEX {} ON {} ({});").format(
+                        sql.Identifier(uix_name),
                         sql.Identifier(table),
-                        sql.Identifier(constraint_name),
                         sql.SQL(", ").join(map(sql.Identifier, keys)),
                     )
-                    # print(alter.as_string(conn))
+                    # print(idx_sql.as_string(conn))
 
-                    cur.execute(query=alter)
+                    # Unique constriants caused problems with overlapping keys?
+                    # constraint_name = f'{table}_{"_".join(keys)}_cst'
+                    # alter = sql.SQL(
+                    #     "ALTER TABLE {} ADD CONSTRAINT {} UNIQUE ({});"
+                    # ).format(
+                    #     sql.Identifier(table),
+                    #     sql.Identifier(constraint_name),
+                    #     sql.SQL(", ").join(map(sql.Identifier, keys)),
+                    # )
 
-                    # Now execute previous insert_ignore statement
+                    cur.execute(query=uix_sql)
+
+                    # Now execute previous upsert statement
                     cur.executemany(query=qry, params_seq=rows)
 
-                except Exception as alter_error:
-                    print(">>> Error: ", alter_error)
+                except Exception as indx_error:
+                    print(">>> Error: ", indx_error)
                     quit()
 
             # Handle all other exceptions
@@ -384,3 +407,21 @@ def upsert(
 
             # Make the changes to the database persistent
             conn.commit()
+
+
+"""
+# TODO: upsert without creating auto-index or constriants
+**Add as option to exisiting upsert(auto_uix=False)
+def upsert_wo_idx():
+    Sudo code
+    This function would be run inside a for loop within a transaction
+    every iteration would result in a update or an insert
+
+    try:
+        update() on keys
+        if update() return value is 0
+        then insert()
+    this code should be much slower but not require creating
+    unique constriants which may be hard to manage especially
+    for novice users
+"""

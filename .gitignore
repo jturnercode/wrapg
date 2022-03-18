@@ -1,15 +1,14 @@
 # Specific Files & Folders
-scratch*.py
+/scratch
+/links
 *.csv
 *.txt
 *.docx
 *.columns
 *.url
-db_funcs.py
+*.db
 main.py
-timer.py
 working.py
-/links
 
 # VirtEnv Files
 
