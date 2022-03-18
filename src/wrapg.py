@@ -1,5 +1,5 @@
 import psycopg
-from psycopg import sql
+from psycopg import sql, errors
 import pandas as pd
 from numpy import nan
 import config
@@ -190,7 +190,7 @@ def insert_ignore(
     data: list[dict] | pd.DataFrame, table: str, keys: list, conn_kwargs: dict = None
 ):
     """Function for SQL's INSERT ON CONFLICT DO NOTHING
-    Add a row into specified table if the row with specified keys does already exist.
+    Add a row into specified table if the row with specified keys does not already exist.
     If rows with matching keys exist no change is made.
     Automatically creates unique constriant if one does not exist for keys provided.
 
@@ -237,7 +237,116 @@ def insert_ignore(
             )
             print(qry.as_string(conn))
 
-            # cur.executemany(query=qry, params_seq=rows)
+            try:
+                cur.executemany(query=qry, params_seq=rows)
+
+            # Catch no unique constriant error
+            except errors.InvalidColumnReference as e:
+                print(">>> Error: ", e)
+                print("> Rolling back, attempt creation of new constriant...")
+                conn.rollback()
+
+                # Alter table and create new unique constriant & try again
+                try:
+                    constraint_name = f'{table}_{"_".join(keys)}_idx'
+                    alter = sql.SQL(
+                        "ALTER TABLE {} ADD CONSTRAINT {} UNIQUE ({});"
+                    ).format(
+                        sql.Identifier(table),
+                        sql.Identifier(constraint_name),
+                        sql.SQL(", ").join(map(sql.Identifier, keys)),
+                    )
+                    # print(alter.as_string(conn))
+
+                    cur.execute(query=alter)
+
+                    # Now execute previous insert_ignore statement
+                    cur.executemany(query=qry, params_seq=rows)
+
+                except Exception as alter_error:
+                    print(">>> Error: ", alter_error)
+                    quit()
+
+            # Handle all other exceptions
+            except Exception as ee:
+                print("Exception: ", ee.__init__)
+                quit()
+
+            # Make the changes to the database persistent
+            conn.commit()
+
+
+def upsert(
+    data: list[dict] | pd.DataFrame, table: str, keys: list, conn_kwargs: dict = None
+):
+    """Function for SQL's INSERT ON CONFLICT DO UPDATE
+    Add a row into specified table if the row with specified keys does not already exist.
+    If rows with matching keys exist, update row values.
+    Automatically creates unique constriant if one does not exist for keys provided.
+
+    Args:
+        data (list[dict] | pd.DataFrame): data in form of dict, list of dict, or dataframe
+        table (str): name of database table
+        keys (list): list of columns
+        conn_kwargs (dict, optional): Specify/overide conn kwargs. See full list of options,
+        https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-PARAMKEYWORDS.
+        Defaults to None, recommend importing via .env file.
+    """
+
+    # Inspect data and return columns and rows
+    columns, rows = _data_transform(data)
+
+    # Initialize conn_kwargs to empty dict if no arguments passed
+    # Merge args into conn_final
+    if conn_kwargs is None:
+        conn_kwargs = {}
+
+    # Final conn parameters to pass to connect()
+    # Set return default type to dictionary, can be overwritten with kwargs
+    conn_final = {**conn_import, **conn_kwargs}
+
+    # Connect to an existing database
+    with psycopg.connect(**conn_final) as conn:
+
+        # Open a cursor to perform database operations
+        with conn.cursor() as cur:
+
+            # INSERT INTO table (name, email)
+            # VALUES('Dave','dave@yahoo.com')
+            # ON CONFLICT (name)
+            # DO UPDATE SET email=excluded.email
+            # WHERE ;
+
+            # Function to compose col=excluded.col sql for update
+            def set_str(cols: list):
+                # Below code was not used becasue it did not
+                # escape the column names
+                # temp = [f"{x}=excluded.{x}" for x in li]
+                # return (", ").join(temp)
+
+                col_update = []
+                for col in cols:
+                    col_update.append(
+                        sql.SQL("{}=excluded.{}").format(
+                            sql.Identifier(col),
+                            sql.Identifier(col),
+                        )
+                    )
+                return col_update
+
+            # =================== Ignore_Insert Qry ==================
+            qry = sql.SQL(
+                "INSERT INTO {} ({}) VALUES ({}) ON CONFLICT ({}) DO UPDATE SET {}"
+            ).format(
+                sql.Identifier(table),
+                sql.SQL(", ").join(map(sql.Identifier, columns)),
+                sql.SQL(", ").join(sql.Placeholder() * len(columns)),
+                sql.SQL(", ").join(map(sql.Identifier, keys)),
+                sql.SQL(", ").join(set_str(columns)),
+                # sql.SQL(set_str(columns)),
+            )
+            print(qry.as_string(conn))
+
             try:
                 cur.executemany(query=qry, params_seq=rows)
 

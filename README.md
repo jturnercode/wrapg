@@ -17,7 +17,7 @@ Project is in infancy: _work in progress_
 - Supports pandas dataframe out of box
 - Configure default postgres db via .env (future)
 - Overide default db/tables with kwargs
-- upsert, insert_ignore functions included (future)
+- upsert, insert_ignore functions included
 
 ## Setup
 Dependencies:
@@ -35,7 +35,9 @@ pipfile included to setup local environment with pipenv
 
 ## Room for Improvement
 - Add copy command
-- Add upsert, update
+- Add update
+- Add Delete funtionality
+- Handle python data types to postgres
 - Add tests
 - Add create_table command
 - Optimize code after it is all working
