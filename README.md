@@ -36,9 +36,11 @@ pipfile included to setup local environment with pipenv
 ## Room for Improvement
 - Add copy command
 - Add update
-- Add Delete funtionality
+- Add delete funtionality
+- Handle JSON, ITERATOR?
 - Handle python data types to postgres
 - Add tests
+- Make into package on pypi
 - Add create_table command
 - Optimize code after it is all working
 
