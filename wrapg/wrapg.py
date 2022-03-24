@@ -1,7 +1,7 @@
+from collections.abc import Iterable
 import psycopg
 from psycopg import sql, errors
 import pandas as pd
-from collections.abc import Iterable
 from wrapg import util
 import config
 
@@ -75,21 +75,21 @@ def query(raw_sql: str, to_df=False, conn_kwargs: dict = None):
                 return iter(cur.fetchall())
 
 
-def insert(data: list[dict] | pd.DataFrame, table: str, conn_kwargs: dict = None):
+def insert(data: Iterable[dict] | pd.DataFrame, table: str, conn_kwargs: dict = None):
 
     """Function for SQL's INSERT
 
     Add a row(s) into specified table
 
     Args:
-        data (list[dict] | pd.DataFrame): data in form of dict, list of dict, or dataframe
+        data (Iterable[dict] | pd.DataFrame): data in form of dict, list of dict, or dataframe
         table (str): name of database table
         conn_kwargs (dict, optional): Specify/overide conn kwargs. See full list of options,
         https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-PARAMKEYWORDS.
         Defaults to None, recommend importing via .env file.
     """
 
-    columns, rows = util.data_transform(data)
+    columns, rows, uniform = util.data_transform(data)
 
     # Initialize conn_kwargs to empty dict if no arguments passed
     # Merge args into conn_final
@@ -108,30 +108,40 @@ def insert(data: list[dict] | pd.DataFrame, table: str, conn_kwargs: dict = None
             # Typ insert statement format
             # INSERT INTO table (col1, col2) VALUES (300, "vehicles");
 
-            # Dynamic insert query for dictionaries
-            # qry = sql.SQL("INSERT INTO {} ({}) VALUES ({})").format(
-            #     sql.Identifier(table),
-            #     sql.SQL(", ").join(map(sql.Identifier, columns)),
-            #     sql.SQL(", ").join(map(sql.Placeholder, columns)),
-            # )
+            if uniform == 1:
+                # Dynamic insert query for dictionaries
+                qry = sql.SQL("INSERT INTO {} ({}) VALUES ({})").format(
+                    sql.Identifier(table),
+                    sql.SQL(", ").join(map(sql.Identifier, columns)),
+                    sql.SQL(", ").join(map(sql.Placeholder, columns)),
+                    # Dynamic insert query for list of tuples
+                    # sql.SQL(", ").join(sql.Placeholder() * len(columns)),
+                )
+                # print(qry.as_string(conn))
+                # One insert for all dictionaries
+                cur.executemany(query=qry, params_seq=rows)
 
-            # Dynamic insert query for list of tuples
-            qry = sql.SQL("INSERT INTO {} ({}) VALUES ({})").format(
-                sql.Identifier(table),
-                sql.SQL(", ").join(map(sql.Identifier, columns)),
-                sql.SQL(", ").join(sql.Placeholder() * len(columns)),
-            )
-            # print(qry.as_string(conn))
-
-            # Simple insert with on variable {}
-            cur.executemany(query=qry, params_seq=rows)
+            else:
+                # For non uniform data
+                for row in rows:
+                    # Dynamic insert query for dictionaries
+                    qry = sql.SQL("INSERT INTO {} ({}) VALUES ({})").format(
+                        sql.Identifier(table),
+                        sql.SQL(", ").join(map(sql.Identifier, tuple(row))),
+                        sql.SQL(", ").join(map(sql.Placeholder, tuple(row))),
+                    )
+                    # Seperate insert for each dictionary
+                    cur.execute(query=qry, params=row)
 
             # Make the changes to the database persistent
             conn.commit()
 
 
 def insert_ignore(
-    data: list[dict] | pd.DataFrame, table: str, keys: list, conn_kwargs: dict = None
+    data: Iterable[dict] | pd.DataFrame,
+    table: str,
+    keys: list,
+    conn_kwargs: dict = None,
 ):
     """Function for SQL's INSERT ON CONFLICT DO NOTHING
 
@@ -140,16 +150,16 @@ def insert_ignore(
     Automatically creates unique index if one does not exist for keys provided.
 
     Args:
-        data (list[dict] | pd.DataFrame): data in form of dict, list of dict, or dataframe
+        data (Iterable[dict] | pd.DataFrame): data in form of dict, list of dict, or dataframe
         table (str): name of database table
-        keys (list): list of columns
+        keys (list): Iterable of columns
         conn_kwargs (dict, optional): Specify/overide conn kwargs. See full list of options,
         https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-PARAMKEYWORDS.
         Defaults to None, recommend importing via .env file.
     """
 
     # Inspect data and return columns and rows
-    columns, rows = util.data_transform(data)
+    columns, rows, uniform = util.data_transform(data)
 
     # Initialize conn_kwargs to empty dict if no arguments passed
     # Merge args into conn_final
@@ -172,19 +182,33 @@ def insert_ignore(
             # DO NOTHING;
 
             # =================== Ignore_Insert Qry ==================
-            qry = sql.SQL(
-                "INSERT INTO {} ({}) VALUES ({}) ON CONFLICT ({}) DO NOTHING"
-            ).format(
-                sql.Identifier(table),
-                sql.SQL(", ").join(map(sql.Identifier, columns)),
-                sql.SQL(", ").join(sql.Placeholder() * len(columns)),
-                # this is technically known as 'conflict target'
-                sql.SQL(", ").join(map(sql.Identifier, keys)),
-            )
-            print(qry.as_string(conn))
-
             try:
-                cur.executemany(query=qry, params_seq=rows)
+                if uniform == 1:
+                    qry = sql.SQL(
+                        "INSERT INTO {} ({}) VALUES ({}) ON CONFLICT ({}) DO NOTHING"
+                    ).format(
+                        sql.Identifier(table),
+                        sql.SQL(", ").join(map(sql.Identifier, columns)),
+                        sql.SQL(", ").join(map(sql.Placeholder, columns)),
+                        # this is technically known as 'conflict target'
+                        sql.SQL(", ").join(map(sql.Identifier, keys)),
+                    )
+                    # print(qry.as_string(conn))
+                    cur.executemany(query=qry, params_seq=rows)
+
+                else:
+                    for row in rows:
+                        qry = sql.SQL(
+                            "INSERT INTO {} ({}) VALUES ({}) ON CONFLICT ({}) DO NOTHING"
+                        ).format(
+                            sql.Identifier(table),
+                            sql.SQL(", ").join(map(sql.Identifier, tuple(row))),
+                            sql.SQL(", ").join(map(sql.Placeholder, tuple(row))),
+                            # this is technically known as 'conflict target'
+                            sql.SQL(", ").join(map(sql.Identifier, keys)),
+                        )
+                    # print(qry.as_string(conn))
+                    cur.execute(query=qry, params=row)
 
             # Catch no unique constriant error
             except errors.InvalidColumnReference as e:
@@ -194,27 +218,39 @@ def insert_ignore(
 
                 # Create new unique index & try again
                 try:
-
                     uix_name = f'{table}_{"_".join(keys)}_uix'
                     uix_sql = sql.SQL("CREATE UNIQUE INDEX {} ON {} ({});").format(
                         sql.Identifier(uix_name),
                         sql.Identifier(table),
                         sql.SQL(", ").join(map(sql.Identifier, keys)),
                     )
-                    constraint_name = f'{table}_{"_".join(keys)}_idx'
-
                     # print(idx_sql.as_string(conn))
-
                     cur.execute(query=uix_sql)
 
-                    # Now execute previous insert_ignore statement
-                    cur.executemany(query=qry, params_seq=rows)
+                    # Try again to execute qry
+                    if uniform == 1:
+                        # Now execute previous insert_ignore statement
+                        cur.executemany(query=qry, params_seq=rows)
+
+                    else:
+                        for row in rows:
+                            qry = sql.SQL(
+                                "INSERT INTO {} ({}) VALUES ({}) ON CONFLICT ({}) DO NOTHING"
+                            ).format(
+                                sql.Identifier(table),
+                                sql.SQL(", ").join(map(sql.Identifier, tuple(row))),
+                                sql.SQL(", ").join(map(sql.Placeholder, tuple(row))),
+                                # this is technically known as 'conflict target'
+                                sql.SQL(", ").join(map(sql.Identifier, keys)),
+                            )
+                        # print(qry.as_string(conn))
+                        cur.execute(query=qry, params=row)
 
                 except Exception as indx_error:
                     print(">>> Error: ", indx_error)
                     quit()
 
-            # Handle all other exceptions
+            # Handle all other exceptions, not InvalidColumn Reference
             except Exception as ee:
                 print("Exception: ", ee.__init__)
                 quit()
@@ -224,7 +260,10 @@ def insert_ignore(
 
 
 def upsert(
-    data: list[dict] | pd.DataFrame, table: str, keys: list, conn_kwargs: dict = None
+    data: Iterable[dict] | pd.DataFrame,
+    table: str,
+    keys: list,
+    conn_kwargs: dict = None,
 ):
     """Function for SQL's INSERT ON CONFLICT DO UPDATE SET
 
@@ -242,7 +281,7 @@ def upsert(
     """
 
     # Inspect data and return columns and rows
-    columns, rows = util.data_transform(data)
+    columns, rows, uniform = util.data_transform(data)
 
     # Initialize conn_kwargs to empty dict if no arguments passed
     # Merge args into conn_final
@@ -350,7 +389,7 @@ def upsert(
 
 
 """
-# TODO: upsert without creating auto-index or constriants
+# TODO: **upsert without creating auto-index or constriants
 **Add as option to exisiting upsert(auto_uix=False)
 def upsert_wo_idx():
     Sudo code
@@ -368,7 +407,10 @@ def upsert_wo_idx():
 
 # ================================= UPDATE ================================
 def update(
-    data: list[dict] | pd.DataFrame, table: str, keys: list, conn_kwargs: dict = None
+    data: list[dict] | pd.DataFrame,
+    table: str,
+    keys: Iterable,
+    conn_kwargs: dict = None,
 ):
     """Function for SQL's UPDATE
 
@@ -379,7 +421,7 @@ def update(
     Args:
         data (list[dict] | pd.DataFrame): data in form of dict, list of dict, or dataframe
         table (str): name of database table
-        keys (list): list of columns
+        keys (Iterable): Iterable of column names synonymous with sql WHERE
         conn_kwargs (dict, optional): Specify/overide conn kwargs. See full list of options,
         https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-PARAMKEYWORDS.
         Defaults to None, recommend importing via .env file.
@@ -432,7 +474,7 @@ def update(
 
             # =================== Update Qry ==================
             if uniform == 1:
-                print("> Uniform Data..")
+                # print("> Uniform Data..")
                 qry = sql.SQL("UPDATE {} SET {} WHERE {}").format(
                     sql.Identifier(table),
                     sql.SQL(", ").join(column_value_str(columns)),
@@ -442,11 +484,11 @@ def update(
 
                 cur.executemany(query=qry, params_seq=rows)
             else:
-                print(">> Non-Uniform Data...")
+                # print(">> Non-Uniform Data...")
                 for row in rows:
                     qry = sql.SQL("UPDATE {} SET {} WHERE {}").format(
                         sql.Identifier(table),
-                        sql.SQL(", ").join(column_value_str(row.keys())),
+                        sql.SQL(", ").join(column_value_str(tuple(row))),
                         sql.SQL(", ").join(column_value_str(keys)),
                     )
 
