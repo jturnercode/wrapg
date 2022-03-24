@@ -272,9 +272,9 @@ def upsert(
     Automatically creates unique index if one does not exist for keys provided.
 
     Args:
-        data (list[dict] | pd.DataFrame): data in form of dict, list of dict, or dataframe
+        data (Iterable[dict] | pd.DataFrame): data in form of dict, list of dict, or dataframe
         table (str): name of database table
-        keys (list): list of columns
+        keys (list): Iterable of columns
         conn_kwargs (dict, optional): Specify/overide conn kwargs. See full list of options,
         https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-PARAMKEYWORDS.
         Defaults to None, recommend importing via .env file.
@@ -306,17 +306,14 @@ def upsert(
             # WHERE ...;
 
             # Function to compose col=excluded.col sql for update
-            def set_str(cols: list):
-
-                col_update = []
-                for col in cols:
-                    col_update.append(
-                        sql.SQL("{}=excluded.{}").format(
-                            sql.Identifier(col),
-                            sql.Identifier(col),
-                        )
+            def set_str(cols: Iterable):
+                def exclude_sql(col):
+                    return sql.SQL("{}=excluded.{}").format(
+                        sql.Identifier(col),
+                        sql.Placeholder(col),
                     )
-                return col_update
+
+                return map(exclude_sql, cols)
 
             # =================== Upsert Qry ==================
             # TODO: add WHERE clause to upsert qry; Do i need it?
@@ -329,20 +326,35 @@ def upsert(
                 else:
                     return sql.SQL(statement without where)
             """
-            qry = sql.SQL(
-                "INSERT INTO {} ({}) VALUES ({}) ON CONFLICT ({}) DO UPDATE SET {}"
-            ).format(
-                sql.Identifier(table),
-                sql.SQL(", ").join(map(sql.Identifier, columns)),
-                sql.SQL(", ").join(sql.Placeholder() * len(columns)),
-                # this is technically known as 'conflict target'
-                sql.SQL(", ").join(map(sql.Identifier, keys)),
-                sql.SQL(", ").join(set_str(columns)),
-            )
-            # print(qry.as_string(conn))
-
             try:
-                cur.executemany(query=qry, params_seq=rows)
+                if uniform == 1:
+                    qry = sql.SQL(
+                        "INSERT INTO {} ({}) VALUES ({}) ON CONFLICT ({}) DO UPDATE SET {}"
+                    ).format(
+                        sql.Identifier(table),
+                        sql.SQL(", ").join(map(sql.Identifier, columns)),
+                        sql.SQL(", ").join(map(sql.Placeholder, columns)),
+                        # this is technically known as 'conflict target'
+                        sql.SQL(", ").join(map(sql.Identifier, keys)),
+                        sql.SQL(", ").join(set_str(columns)),
+                    )
+                    # print(qry.as_string(conn))
+                    cur.executemany(query=qry, params_seq=rows)
+
+                else:
+                    for row in rows:
+                        qry = sql.SQL(
+                            "INSERT INTO {} ({}) VALUES ({}) ON CONFLICT ({}) DO UPDATE SET {}"
+                        ).format(
+                            sql.Identifier(table),
+                            sql.SQL(", ").join(map(sql.Identifier, tuple(row))),
+                            sql.SQL(", ").join(map(sql.Placeholder, tuple(row))),
+                            # this is technically known as 'conflict target'
+                            sql.SQL(", ").join(map(sql.Identifier, keys)),
+                            sql.SQL(", ").join(set_str(tuple(row))),
+                        )
+                        # print(qry.as_string(conn))
+                        cur.execute(query=qry, params=row)
 
             # Catch no unique index error
             except errors.InvalidColumnReference as e:
@@ -360,20 +372,26 @@ def upsert(
                     )
                     # print(idx_sql.as_string(conn))
 
-                    # Unique constriants caused problems with overlapping keys?
-                    # constraint_name = f'{table}_{"_".join(keys)}_cst'
-                    # alter = sql.SQL(
-                    #     "ALTER TABLE {} ADD CONSTRAINT {} UNIQUE ({});"
-                    # ).format(
-                    #     sql.Identifier(table),
-                    #     sql.Identifier(constraint_name),
-                    #     sql.SQL(", ").join(map(sql.Identifier, keys)),
-                    # )
-
                     cur.execute(query=uix_sql)
 
-                    # Now execute previous upsert statement
-                    cur.executemany(query=qry, params_seq=rows)
+                    if uniform == 1:
+                        # Now execute previous upsert statement
+                        cur.executemany(query=qry, params_seq=rows)
+
+                    else:
+                        for row in rows:
+                            qry = sql.SQL(
+                                "INSERT INTO {} ({}) VALUES ({}) ON CONFLICT ({}) DO UPDATE SET {}"
+                            ).format(
+                                sql.Identifier(table),
+                                sql.SQL(", ").join(map(sql.Identifier, tuple(row))),
+                                sql.SQL(", ").join(map(sql.Placeholder, tuple(row))),
+                                # this is technically known as 'conflict target'
+                                sql.SQL(", ").join(map(sql.Identifier, keys)),
+                                sql.SQL(", ").join(set_str(tuple(row))),
+                            )
+                            # print(qry.as_string(conn))
+                            cur.execute(query=qry, params=row)
 
                 except Exception as indx_error:
                     print(">>> Error: ", indx_error)
