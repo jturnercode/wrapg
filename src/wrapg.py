@@ -1,7 +1,8 @@
 import psycopg
 from psycopg import sql, errors
 import pandas as pd
-import util
+from collections.abc import Iterable
+from src import util
 import config
 
 
@@ -267,10 +268,6 @@ def upsert(
 
             # Function to compose col=excluded.col sql for update
             def set_str(cols: list):
-                # Below code was not used becasue it did not
-                # escape the column names
-                # temp = [f"{x}=excluded.{x}" for x in li]
-                # return (", ").join(temp)
 
                 col_update = []
                 for col in cols:
@@ -370,73 +367,90 @@ def upsert_wo_idx():
 """
 
 # ================================= UPDATE ================================
-# def update(
-#     data: list[dict] | pd.DataFrame, table: str, keys: list, conn_kwargs: dict = None
-# ):
-#     """Function for SQL's UPDATE
+def update(
+    data: list[dict] | pd.DataFrame, table: str, keys: list, conn_kwargs: dict = None
+):
+    """Function for SQL's UPDATE
 
-#     If rows with matching keys exist, update row values.
-#     The columns that do not appear in the 'data' retain their original values.
-#     Make sure data has keys specified in function.
+    If rows with matching keys exist, update row values.
+    The columns that do not appear in the 'data' retain their original values.
+    Make sure data has keys specified in function.
 
-#     Args:
-#         data (list[dict] | pd.DataFrame): data in form of dict, list of dict, or dataframe
-#         table (str): name of database table
-#         keys (list): list of columns
-#         conn_kwargs (dict, optional): Specify/overide conn kwargs. See full list of options,
-#         https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-PARAMKEYWORDS.
-#         Defaults to None, recommend importing via .env file.
-#     """
+    Args:
+        data (list[dict] | pd.DataFrame): data in form of dict, list of dict, or dataframe
+        table (str): name of database table
+        keys (list): list of columns
+        conn_kwargs (dict, optional): Specify/overide conn kwargs. See full list of options,
+        https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-PARAMKEYWORDS.
+        Defaults to None, recommend importing via .env file.
+    """
 
-#     # Inspect data and return columns and rows
-#     columns, rows = util.data_transform(data)
+    # Inspect data and return columns and rows
+    columns, rows, uniform = util.data_transform(data)
 
-#     # Initialize conn_kwargs to empty dict if no arguments passed
-#     # Merge args into conn_final
-#     if conn_kwargs is None:
-#         conn_kwargs = {}
+    # Initialize conn_kwargs to empty dict if no arguments passed
+    # Merge args into conn_final
+    if conn_kwargs is None:
+        conn_kwargs = {}
 
-#     # Final conn parameters to pass to connect()
-#     # Set return default type to dictionary, can be overwritten with kwargs
-#     conn_final = {**conn_import, **conn_kwargs}
+    # Final conn parameters to pass to connect()
+    # Set return default type to dictionary, can be overwritten with kwargs
+    conn_final = {**conn_import, **conn_kwargs}
 
-#     # Connect to an existing database
-#     with psycopg.connect(**conn_final) as conn:
+    # Connect to an existing database
+    with psycopg.connect(**conn_final) as conn:
 
-#         # Open a cursor to perform database operations
-#         with conn.cursor() as cur:
+        # Open a cursor to perform database operations
+        with conn.cursor() as cur:
 
-#             # UPDATE syntax
-#             # UPDATE table_name
-#             # SET column1 = value1,
-#             #     column2 = value2,
-#             #     ...
-#             # WHERE condition
-#             # RETURNING * | output_expression AS output_name;
+            # Syntax
+            # UPDATE table_name
+            # SET column1 = value1,
+            #     column2 = value2,
+            #     ...
+            # TODO: Where clause is optional, add code if None update all
+            # WHERE column = value, ...
+            # RETURNING * | output_expression AS output_name;
 
-#             # Function to compose SET col=value sql for update
-#             def set_str(row: tuple):
-#                 row_update = []
-#                 for pair in row:
-#                     row_update.append(
-#                         sql.SQL("{}={}").format(
-#                             sql.Identifier(pair.key),
-#                             sql.Identifier(pair.value),
-#                         )
-#                     )
-#                 return row_update
+            # Function to compose col=value sql str
+            def column_value_str(column_names: Iterable):
+                """Create psycopg composable sql string for
+                variable number of columns/value pairs
+                ie column=value scenerios, col=%(col)s
 
-#             # =================== Update Qry ==================
-#             for r in rows:
-#                 qry = sql.SQL("UPDATE {} SET {} WHERE {}").format(
-#                     sql.Identifier(table),
-#                     # sql.SQL(", ").join(sql.Placeholder() * len(columns)),
-#                     sql.SQL(", ").join(set_str(r)),
-#                     sql.SQL(", ").join(where_str(keys)),
-#                 )
-#                 print(qry.as_string(conn))
+                Args:
+                    column_names (Iterable): column names
+                """
+                # function used to map to column names
+                def set_sql(col):
+                    return sql.SQL("{}={}").format(
+                        sql.Identifier(col),
+                        sql.Placeholder(col),
+                    )
 
-#                 cur.execute(query=qry, params=r)
+                return map(set_sql, column_names)
 
-#             # Make the changes to the database persistent
-#             conn.commit()
+            # =================== Update Qry ==================
+            if uniform == 1:
+                print("> Uniform Data..")
+                qry = sql.SQL("UPDATE {} SET {} WHERE {}").format(
+                    sql.Identifier(table),
+                    sql.SQL(", ").join(column_value_str(columns)),
+                    sql.SQL(", ").join(column_value_str(keys)),
+                )
+                print(qry.as_string(conn))
+
+                cur.executemany(query=qry, params_seq=rows)
+            else:
+                print(">> Non-Uniform Data...")
+                for row in rows:
+                    qry = sql.SQL("UPDATE {} SET {} WHERE {}").format(
+                        sql.Identifier(table),
+                        sql.SQL(", ").join(column_value_str(row.keys())),
+                        sql.SQL(", ").join(column_value_str(keys)),
+                    )
+
+                    cur.execute(query=qry, params=row)
+
+            # Make the changes to the database persistent
+            conn.commit()
