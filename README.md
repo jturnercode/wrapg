@@ -1,6 +1,7 @@
 # wrapg
-> Wrapper around [_psycopg 3.x_](https://www.psycopg.org/psycopg3/docs/index.html) meant to make easy use of postgres within scripts.
-Project is in infancy: _work in progress_ 
+Wrapper around [_psycopg 3.x_](https://www.psycopg.org/psycopg3/docs/index.html) meant to make easy use of postgres within scripts using simple functions.
+
+Project is in infancy, _work in progress_.
 
 ## Table of Contents
 * [Features](#features)
@@ -13,11 +14,14 @@ Project is in infancy: _work in progress_
 
 
 ## Features
-- Pass various data structutes to simple function
-- Supports pandas dataframe out of box
+- Simple functions to run postgres sql via python
+- Pass various data structutes into sql functions
+    - supports pandas dataframe out of box
 - Configure default postgres db via .env (future)
-- Overide default db/tables with kwargs
-- upsert, insert_ignore functions included
+    - overide default db/tables with kwargs
+- Upsert, insert_ignore functions included
+    - automatically creates index
+    - option to upsert/insert_ignore without creating index (future)
 
 ## Setup
 Dependencies:
@@ -35,13 +39,12 @@ pipfile included to setup local environment with pipenv
 
 ## Room for Improvement
 - Add copy command
-- Add update
 - Add delete funtionality
+- Add create_table command
 - Handle JSON, ITERATOR?
 - Handle python data types to postgres
 - Add tests
 - Make into package on pypi
-- Add create_table command
 - Optimize code after it is all working
 
 
