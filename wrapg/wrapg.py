@@ -2,7 +2,7 @@ import psycopg
 from psycopg import sql, errors
 import pandas as pd
 from collections.abc import Iterable
-from src import util
+from wrapg import util
 import config
 
 
