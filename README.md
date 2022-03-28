@@ -22,6 +22,7 @@ Project is in infancy, _work in progress_.
 - Upsert, insert_ignore functions included
     - automatically creates index
     - option to upsert/insert_ignore without creating index (future)
+- Copy function to follow postgres COPY protocol (future)
 
 ## Setup
 Dependencies:
@@ -38,11 +39,8 @@ pipfile included to setup local environment with pipenv
 
 
 ## Room for Improvement
-- Add copy command
 - Add delete funtionality
-- Add create_table command
 - Handle JSON, ITERATOR?
-- Handle python data types to postgres
 - Add tests
 - Make into package on pypi
 - Optimize code after it is all working
