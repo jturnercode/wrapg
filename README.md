@@ -22,7 +22,7 @@ Project is in infancy, _work in progress_.
 - Upsert, insert_ignore functions included
     - automatically creates index
     - option to upsert/insert_ignore without creating index (future)
-- Copy function to follow postgres COPY protocol (future)
+- Copy functions to follow postgres COPY protocol *(today only csv is avail)*
 
 ## Setup
 Dependencies:
@@ -47,13 +47,13 @@ pipfile included to setup local environment with pipenv
 
 
 ## Acknowledgements
-This project was inspired by [_dataset_](https://dataset.readthedocs.io/en/latest/)
+This project built on great work by [psycopg 3](https://www.psycopg.org/psycopg3/docs/index.html) and was inspired by [_dataset_](https://dataset.readthedocs.io/en/latest/) 
 
 
 ## Contact
 Created by [_jturnercode_](https://github.com/jturnercode) - hope it will help you out one day.
 
 ## License
-- TODO: Add later
+- MIT
 
 

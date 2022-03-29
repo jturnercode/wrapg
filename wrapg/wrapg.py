@@ -33,10 +33,10 @@ def query(raw_sql: str, to_df=False, conn_kwargs: dict = None):
 
     Args:
         raw_sql (str): sql query in string form.
+        to_df (bool, optional): Return results of query in dataframe. Defaults to False.
         conn_kwargs (dict, optional): Specify/overide conn kwargs. See full list of options,
         https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-PARAMKEYWORDS.
         Defaults to None, recommend importing via .env file.
-        to_df (bool, optional): Return results of query in dataframe. Defaults to False.
 
     Returns:
         _type_: iterator or Dataframe
@@ -542,7 +542,7 @@ def create_table(table: str, columns: dict, conn_kwargs: dict = None):
 
     # Final connection args to pass to connect()
     # Set default return type (row factory) to dictionary, can be overwritten with kwargs
-    conn_final = {"row_factory": psycopg.rows.dict_row, **conn_import, **conn_kwargs}
+    conn_final = {**conn_import, **conn_kwargs}
 
     # Connect to an existing database
     with psycopg.connect(**conn_final) as conn:
@@ -586,53 +586,70 @@ def create_table(table: str, columns: dict, conn_kwargs: dict = None):
             conn.commit()
 
 
-# def copy(raw_sql: str, to_df=False, conn_kwargs: dict = None):
-#     """Function to send raw sql query to postgres db.
+def copy_from_csv(
+    table: str,
+    csv_file: str,
+    header: bool = False,
+    block_size=50_000,
+    conn_kwargs: dict = None,
+):
+    # TODO: Account for using other data from Iterable of sequence like list(tuples)
+    """Copy .csv data to table using postgres copy protocol.
 
-#     Args:
-#         raw_sql (str): sql query in string form.
-#         conn_kwargs (dict, optional): Specify/overide conn kwargs. See full list of options,
-#         https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-PARAMKEYWORDS.
-#         Defaults to None, recommend importing via .env file.
-#         to_df (bool, optional): Return results of query in dataframe. Defaults to False.
+    Args:
+        table (str): table name to run copy command on
+        csv_file (str): csv file path
+        header (bool): True indicates file has header and will ignore it.
+        conn_kwargs (dict, optional): Specify/overide conn kwargs. See full list of options,
+        https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-PARAMKEYWORDS.
+        Defaults to None, recommend importing via .env file.
 
-#     Returns:
-#         _type_: iterator or Dataframe
-#     """
+    Returns:
+        _type_: None
+    """
 
-#     # Initialize conn_kwargs to empty dict if no arguments passed
-#     # Merge args into conn_final
-#     if conn_kwargs is None:
-#         conn_kwargs = {}
+    # Initialize conn_kwargs to empty dict if no arguments passed
+    # Merge args into conn_final
+    if conn_kwargs is None:
+        conn_kwargs = {}
 
-#     # Final connection args to pass to connect()
-#     # Set default return type (row factory) to dictionary, can be overwritten with kwargs
-#     conn_final = {"row_factory": psycopg.rows.dict_row, **conn_import, **conn_kwargs}
+    # Final connection args to pass to connect()
+    # Set default return type (row factory) to dictionary, can be overwritten with kwargs
+    conn_final = {**conn_import, **conn_kwargs}
 
+    # Connect to an existing database
+    with psycopg.connect(**conn_final) as conn:
+        # Open a cursor to perform database operations
+        with conn.cursor() as cur:
 
-#     # Connect to an existing database
-#     with psycopg.connect(**conn_final) as conn:
-#         # Open a cursor to perform database operations
-#         with conn.cursor() as cur:
+            # Return composable sql statement
+            if header:
+                copy_sql = sql.SQL(
+                    "COPY {} FROM STDIN WITH (FORMAT csv, HEADER TRUE)"
+                ).format(sql.Identifier(table))
+            else:
+                copy_sql = sql.SQL("COPY {} FROM STDIN WITH (FORMAT csv)").format(
+                    sql.Identifier(table)
+                )
 
-#             with open("data", "r") as f:
-#                 with cur.copy("COPY data FROM STDIN") as copy:
-#                     while data := f.read(BLOCK_SIZE):
-#                         copy.write(data)
-#             # Pass raw_sql to execute()
-#             # example: cur.execute("SELECT * FROM tablename WHERE id = 4")
-#             cur.execute(query=raw_sql)
+                # used for write_row(); list of tuples
+                # copy_sql = sql.SQL("COPY {} FROM STDIN").format(sql.Identifier(table))
 
-#             # Used for testing output of raw_sql
-#             # print("rowcount: ", cur.rowcount)
-#             # print("statusmessage: ", cur.statusmessage)
-#             # print(cur)
+            with open(csv_file, "r") as f:
+                # see postgres copy options
+                # https://www.postgresql.org/docs/current/sql-copy.html
 
-#             # .statusmessage returns string of type of operation processed
-#             # If 'select' in status message return records as df or iter
-#             if "SELECT" in cur.statusmessage:
-#                 if to_df is True:
-#                     return pd.DataFrame(cur, dtype="object")
+                #! SPECIFIC COLUMNS NOT WORKING; Open ticket with pyscopg
+                # "COPY cust (name, age) FROM STDIN WITH (FORMAT csv)"
 
-#                 # Save memory return iterator
-#                 return iter(cur.fetchall())
+                with cur.copy(copy_sql) as copy:
+
+                    # using blocks/chunks
+                    while data := f.read(block_size):
+                        copy.write(data)
+
+                    # # Use write_row() for list(tuples) or iterable of sequences
+                    # #! Do not specify COPY options such as FORMAT CSV, DELIMITER, NULL
+                    # t = [("bill", 50, "here"), ("ronnie", 50, "there")]
+                    # for ff in t:
+                    #     copy.write_row(ff)
