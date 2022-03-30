@@ -567,10 +567,14 @@ def create_table(table: str, columns: dict, conn_kwargs: dict = None):
                 """
                 # function used to map to column names
                 def col_sql(col, value):
+                    return sql.SQL(f'"{col}" {value.upper()}')
+
                     # TODO: Could not figure how to escape below? using .format()?
-                    return sql.SQL(
-                        col + " " + value.upper(),
-                    )
+                    # sql.SQL("{}").format(
+                    # sql.Identifier(col),
+                    # + sql.Literal(" ")
+                    # + sql.Literal(value.upper())
+                    # literal retruns quotes around value, not proper sql
 
                 return [col_sql(k, v) for k, v in column_info.items()]
 
@@ -578,7 +582,7 @@ def create_table(table: str, columns: dict, conn_kwargs: dict = None):
                 sql.Identifier(table),
                 sql.SQL(", ").join(define_column(columns)),
             )
-            # print(qry.as_string(conn))
+            print(qry.as_string(conn))
 
             cur.execute(query=qry)
 
@@ -594,6 +598,8 @@ def copy_from_csv(
     conn_kwargs: dict = None,
 ):
     # TODO: Account for using other data from Iterable of sequence like list(tuples)
+    # TODO: Can i return the number of copied rows per postgres standard
+    # TODO: Auto create table based on csv, use pandas(chunk), translate data types
     """Copy .csv data to table using postgres copy protocol.
 
     Args:
@@ -622,6 +628,8 @@ def copy_from_csv(
         # Open a cursor to perform database operations
         with conn.cursor() as cur:
 
+            #! SPECIFIC COLUMNS NOT WORKING; Open ticket with pyscopg?
+            # "COPY cust (name, age) FROM STDIN WITH (FORMAT csv)"
             # Return composable sql statement
             if header:
                 copy_sql = sql.SQL(
@@ -638,9 +646,6 @@ def copy_from_csv(
             with open(csv_file, "r") as f:
                 # see postgres copy options
                 # https://www.postgresql.org/docs/current/sql-copy.html
-
-                #! SPECIFIC COLUMNS NOT WORKING; Open ticket with pyscopg
-                # "COPY cust (name, age) FROM STDIN WITH (FORMAT csv)"
 
                 with cur.copy(copy_sql) as copy:
 
