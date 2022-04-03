@@ -17,8 +17,10 @@ Project is in infancy, _work in progress_.
 - Simple functions to run postgres sql via python
 - Pass various data structutes into sql functions
     - supports pandas dataframe out of box
-- Configure default postgres db via .env (future)
-    - overide default db/tables with kwargs
+- Auto import default postgres connection parameters via .env
+    - saves on repeating code to specify connection
+    - overide default connection parameters with kwargs in each function
+    - see examples for more details *(future)*
 - Upsert, insert_ignore functions included
     - automatically creates index
     - option to upsert/insert_ignore without creating index (future)

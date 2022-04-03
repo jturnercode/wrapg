@@ -3,7 +3,7 @@ import psycopg
 from psycopg import sql, errors
 import pandas as pd
 from wrapg import util
-import config
+import os
 
 
 # ===========================================================================
@@ -15,16 +15,17 @@ import config
 # Inspired by dataset library that wraps sqlalchemy
 # ================================= TODO ================================
 # TODO: Can query() return explain analyse info?
-# TODO: Conditionally import config/env else initialize as {}
-# TODO: Implement copy function, update, delete
+# TODO: Conditionally import config?
+# TODO: Implement delete
 # ===========================================================================
 
+# TODO: Add proper exceptions if parameters are missing or do not work
 conn_import: dict = {
-    "user": config.DB_USERNAME,
-    "password": config.DB_PASSWORD,
-    "host": config.DB_HOST,
-    "dbname": config.DB_NAME,
-    "port": config.DB_PORT,
+    "user": os.environ.get("PG_USERNAME"),
+    "password": os.environ.get("PG_PASSWORD"),
+    "host": os.environ.get("PG_HOST"),
+    "dbname": os.environ.get("PG_DBNAME"),
+    "port": os.environ.get("PG_PORT"),
 }
 
 
