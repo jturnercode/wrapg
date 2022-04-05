@@ -1,0 +1,3 @@
+global-exclude *.csv
+global-exclude *.html
+global-exclude .env

@@ -1,9 +1,9 @@
+import os
 from collections.abc import Iterable
 import psycopg
 from psycopg import sql, errors
 import pandas as pd
 from wrapg import util
-import os
 
 
 # ===========================================================================
@@ -20,6 +20,7 @@ import os
 # ===========================================================================
 
 # TODO: Add proper exceptions if parameters are missing or do not work
+# TODO: expose conn_import in init.py as class to easily modify attributes?? vs dict?
 conn_import: dict = {
     "user": os.environ.get("PG_USERNAME"),
     "password": os.environ.get("PG_PASSWORD"),

@@ -29,18 +29,15 @@ Project is in infancy, _work in progress_.
 ## Setup
 Dependencies:
 - python 3.10+
-- [psycopg 3.0.9+](https://www.psycopg.org/psycopg3/docs/index.html)
-- [pandas 4.1+](https://pandas.pydata.org/docs/index.html)
-
-pipfile included to setup local environment with pipenv
-- TODO: add more details later
+- [psycopg[binary]>=3.0.11](https://www.psycopg.org/psycopg3/docs/index.html)
+- [pandas>=1.4.2](https://pandas.pydata.org/docs/index.html)
 
 
 ## Usage
 - TODO: add examples later
 
 
-## Room for Improvement
+## Todo
 - Add delete funtionality
 - Handle JSON, ITERATOR?
 - Add tests
@@ -53,7 +50,7 @@ This project built on great work by [psycopg 3](https://www.psycopg.org/psycopg3
 
 
 ## Contact
-Created by [_jturnercode_](https://github.com/jturnercode) - hope it will help you out one day.
+Created by [_jturnercode_](https://github.com/jturnercode) - hope package is helps.
 
 ## License
 - MIT

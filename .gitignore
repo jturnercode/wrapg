@@ -13,6 +13,15 @@ working.py
 
 # VirtEnv Files
 
+
+# setup.cfg dist directory
+dist
+
+# Egg metadata
+*.egg-info
+.eggs
+.pypirc
+
 # config files
 config.py
 configfile.py
