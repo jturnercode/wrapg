@@ -38,7 +38,7 @@ Dependencies:
 
 
 ## Todo
-- Add delete funtionality
+- Add delete_row, delete funtionality
 - Handle JSON, ITERATOR?
 - Add tests
 - Make into package on pypi
