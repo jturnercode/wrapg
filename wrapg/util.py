@@ -13,7 +13,7 @@ def uniform_data(iter_dict: Iterable[dict]) -> int:
     for each dictionary (non uniform key/pair data)
 
     Args:
-        iter_dict (_type_): Iterable of dictionarie
+        iter_dict (_type_): Iterable of dictionaries
         representing data to be processed into database
 
     Return:
@@ -21,15 +21,16 @@ def uniform_data(iter_dict: Iterable[dict]) -> int:
      then this indicates all dicts in list
      have the same keys (uniform)
     """
-    # Check if all instances are type dict
-    def check_alldict(d):
+    # Check if dict
+    def check_dict(d):
         return isinstance(d, dict)
 
-    all_dict = all(map(check_alldict, iter_dict))
+    # Check if all instances are type dict
+    all_dict = all(map(check_dict, iter_dict))
     # print(all_dict)
 
     if not all_dict:
-        raise BaseException("Iterable has mixed types, expected all dictionaries")
+        raise BaseException("Iterable has mixed types, expected Iterable[dictionaries]")
 
     def tup_sort(dict) -> tuple:
         """Return sorted tuple of keys for each dict"""
@@ -85,15 +86,10 @@ def data_transform(data_structure):
             # print(rows)
             return columns, rows, uniform
 
-        case list() | tuple() | set():
+        case list() | tuple():
             # print("type -> list/tuple of dictionaries")
 
-            # =========== iterable[dict] to iterable(tuple) not used ============
-            # TODO: improve? dataframes with large datasets, CHUNK?
-            # Pass data into dataframe to make sure it is in
-            # !consistent order and account for non-uniform data
-            # This allows for one dynamic query vs having to
-            # recreate query for each row(dictionary)
+            # =========== iterable[dict] to df not used============
             # !ISSUE: Convert dict to df may update some columns
             # !for non-uniform case to None, unintentionally
             # !(non-uniform keys in all dicts to df)
@@ -105,6 +101,7 @@ def data_transform(data_structure):
 
             # return tuple(dict.keys of first instance in Iterable)
             columns = tuple(data_structure[0])
+            # uniform_data also confirms Iterable[dict] else throws error
             uniform = uniform_data(data_structure)
 
             return columns, data_structure, uniform
@@ -117,9 +114,11 @@ def data_transform(data_structure):
 
             # return keys of dict in a tuple
             columns = tuple(data_structure)
+            # tuple of one dictionary
+            row = (data_structure,)
             uniform = 1
 
-            return columns, (data_structure), uniform
+            return columns, row, uniform
 
         case []:
             raise ValueError(
