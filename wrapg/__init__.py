@@ -7,5 +7,6 @@ from wrapg.wrapg import (
     create_table,
     update,
     upsert,
+    insert,
     insert_ignore,
 )
