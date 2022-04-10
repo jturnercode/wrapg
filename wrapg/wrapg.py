@@ -310,9 +310,9 @@ def upsert(
             # Function to compose col=excluded.col sql for update
             def set_str(cols: Iterable):
                 def exclude_sql(col):
-                    return sql.SQL("{}=excluded.{}").format(
+                    return sql.SQL("{}=EXCLUDED.{}").format(
                         sql.Identifier(col),
-                        sql.Placeholder(col),
+                        sql.Identifier(col),
                     )
 
                 return map(exclude_sql, cols)
@@ -328,6 +328,10 @@ def upsert(
                 else:
                     return sql.SQL(statement without where)
             """
+
+            # columns - keys, columns to update
+            update_columns = set(columns).difference(set(keys))
+
             try:
                 if uniform == 1:
                     qry = sql.SQL(
@@ -338,7 +342,7 @@ def upsert(
                         sql.SQL(", ").join(map(sql.Placeholder, columns)),
                         # this is technically known as 'conflict target'
                         sql.SQL(", ").join(map(sql.Identifier, keys)),
-                        sql.SQL(", ").join(set_str(columns)),
+                        sql.SQL(", ").join(set_str(update_columns)),
                     )
                     # print(qry.as_string(conn))
                     cur.executemany(query=qry, params_seq=rows)
@@ -361,7 +365,7 @@ def upsert(
             # Catch no unique index error
             except errors.InvalidColumnReference as e:
                 print(">>> Error: ", e)
-                print("> Rolling back, attempt creation of new constriant...")
+                print(f"> Creating unique index for {keys}...")
                 conn.rollback()
 
                 # Add unique index & try again
@@ -500,7 +504,7 @@ def update(
                     sql.SQL(", ").join(column_value_str(columns)),
                     sql.SQL(", ").join(column_value_str(keys)),
                 )
-                print(qry.as_string(conn))
+                # print(qry.as_string(conn))
 
                 cur.executemany(query=qry, params_seq=rows)
             else:
@@ -584,7 +588,7 @@ def create_table(table: str, columns: dict, conn_kwargs: dict = None):
                 sql.Identifier(table),
                 sql.SQL(", ").join(define_column(columns)),
             )
-            print(qry.as_string(conn))
+            # print(qry.as_string(conn))
 
             cur.execute(query=qry)
 
