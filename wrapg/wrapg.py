@@ -329,8 +329,11 @@ def upsert(
                     return sql.SQL(statement without where)
             """
 
-            # columns - keys, columns to update
-            update_columns = set(columns).difference(set(keys))
+            # Silenced update_columns code as there is instances where
+            # you may need to update a key. timestamp when updating record
+            # leaving here for now in case i find issues later
+            # columns - keys, columns to update set etc
+            # update_columns = set(columns).difference(set(keys))
 
             try:
                 if uniform == 1:
@@ -342,7 +345,7 @@ def upsert(
                         sql.SQL(", ").join(map(sql.Placeholder, columns)),
                         # this is technically known as 'conflict target'
                         sql.SQL(", ").join(map(sql.Identifier, keys)),
-                        sql.SQL(", ").join(set_str(update_columns)),
+                        sql.SQL(", ").join(set_str(columns)),
                     )
                     # print(qry.as_string(conn))
                     cur.executemany(query=qry, params_seq=rows)
