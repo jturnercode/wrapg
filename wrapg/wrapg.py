@@ -3,7 +3,7 @@ from collections.abc import Iterable
 import psycopg
 from psycopg import sql, errors
 import pandas as pd
-from wrapg import util
+from wrapg import util, snippet
 
 
 # ===========================================================================
@@ -178,39 +178,30 @@ def insert_ignore(
         # Open a cursor to perform database operations
         with conn.cursor() as cur:
 
+            # =================== Ignore_Insert Qry ==================
             # INSERT INTO table (name, email)
             # VALUES('Dave','dave@yahoo.com')
             # ON CONFLICT (name)
             # DO NOTHING;
 
-            # =================== Ignore_Insert Qry ==================
             try:
+                # uniform column names thru data submitted
                 if uniform == 1:
-                    qry = sql.SQL(
-                        "INSERT INTO {} ({}) VALUES ({}) ON CONFLICT ({}) DO NOTHING"
-                    ).format(
-                        sql.Identifier(table),
-                        sql.SQL(", ").join(map(sql.Identifier, columns)),
-                        sql.SQL(", ").join(map(sql.Placeholder, columns)),
-                        # this is technically known as 'conflict target'
-                        sql.SQL(", ").join(map(sql.Identifier, keys)),
+                    # get sql qry based on passed parameters
+                    qry = snippet.insert_ignore_snip(
+                        table=table, columns=columns, keys=keys
                     )
                     # print(qry.as_string(conn))
                     cur.executemany(query=qry, params_seq=rows)
 
                 else:
                     for row in rows:
-                        qry = sql.SQL(
-                            "INSERT INTO {} ({}) VALUES ({}) ON CONFLICT ({}) DO NOTHING"
-                        ).format(
-                            sql.Identifier(table),
-                            sql.SQL(", ").join(map(sql.Identifier, tuple(row))),
-                            sql.SQL(", ").join(map(sql.Placeholder, tuple(row))),
-                            # this is technically known as 'conflict target'
-                            sql.SQL(", ").join(map(sql.Identifier, keys)),
+                        # get sql qry based on passed parameters for each row
+                        qry = snippet.insert_ignore_snip(
+                            table=table, columns=tuple(row), keys=keys
                         )
-                    # print(qry.as_string(conn))
-                    cur.execute(query=qry, params=row)
+                        # print(qry.as_string(conn))
+                        cur.execute(query=qry, params=row)
 
             # Catch no unique constriant error
             except errors.InvalidColumnReference as e:
@@ -218,35 +209,26 @@ def insert_ignore(
                 print("> Rolling back, attempt creation of new constriant...")
                 conn.rollback()
 
-                # Create new unique index & try again
                 try:
-                    uix_name = f'{table}_{"_".join(keys)}_uix'
-                    uix_sql = sql.SQL("CREATE UNIQUE INDEX {} ON {} ({});").format(
-                        sql.Identifier(uix_name),
-                        sql.Identifier(table),
-                        sql.SQL(", ").join(map(sql.Identifier, keys)),
-                    )
-                    # print(idx_sql.as_string(conn))
+                    # Create new unique index & try insert_ignore again
+                    uix_sql = snippet.create_unique_index(table=table, keys=keys)
+                    # print(uix_sql.as_string(conn))
                     cur.execute(query=uix_sql)
 
-                    # Try again to execute qry
                     if uniform == 1:
+                        qry = snippet.insert_ignore_snip(
+                            table=table, columns=columns, keys=keys
+                        )
                         # Now execute previous insert_ignore statement
                         cur.executemany(query=qry, params_seq=rows)
 
                     else:
                         for row in rows:
-                            qry = sql.SQL(
-                                "INSERT INTO {} ({}) VALUES ({}) ON CONFLICT ({}) DO NOTHING"
-                            ).format(
-                                sql.Identifier(table),
-                                sql.SQL(", ").join(map(sql.Identifier, tuple(row))),
-                                sql.SQL(", ").join(map(sql.Placeholder, tuple(row))),
-                                # this is technically known as 'conflict target'
-                                sql.SQL(", ").join(map(sql.Identifier, keys)),
+                            qry = snippet.insert_ignore_snip(
+                                table=table, columns=tuple(row), keys=keys
                             )
-                        # print(qry.as_string(conn))
-                        cur.execute(query=qry, params=row)
+                            # print(qry.as_string(conn))
+                            cur.execute(query=qry, params=row)
 
                 except Exception as indx_error:
                     print(">>> Error: ", indx_error)
@@ -300,67 +282,24 @@ def upsert(
         # Open a cursor to perform database operations
         with conn.cursor() as cur:
 
-            # Typical syntax
+            # =================== Upsert Qry ==================
             # INSERT INTO table (name, email)
             # VALUES('Dave','dave@yahoo.com')
             # ON CONFLICT (name)
             # DO UPDATE SET email=excluded.email
             # WHERE ...;
 
-            # Function to compose col=excluded.col sql for update
-            def set_str(cols: Iterable):
-                def exclude_sql(col):
-                    return sql.SQL("{}=EXCLUDED.{}").format(
-                        sql.Identifier(col),
-                        sql.Identifier(col),
-                    )
-
-                return map(exclude_sql, cols)
-
-            # =================== Upsert Qry ==================
-            # TODO: add WHERE clause to upsert qry; Do i need it?
-            """
-            WHERE excluded.validDate>phonebook2.validDate;
-            sudo code fro add where
-            def sql_to_format()
-                if where:
-                    return sql.SQL(statement with where)
-                else:
-                    return sql.SQL(statement without where)
-            """
-
-            # Silenced update_columns code as there is instances where
-            # you may need to update a key. timestamp when updating record
-            # leaving here for now in case i find issues later
-            # columns - keys, columns to update set etc
-            # update_columns = set(columns).difference(set(keys))
-
             try:
                 if uniform == 1:
-                    qry = sql.SQL(
-                        "INSERT INTO {} ({}) VALUES ({}) ON CONFLICT ({}) DO UPDATE SET {}"
-                    ).format(
-                        sql.Identifier(table),
-                        sql.SQL(", ").join(map(sql.Identifier, columns)),
-                        sql.SQL(", ").join(map(sql.Placeholder, columns)),
-                        # this is technically known as 'conflict target'
-                        sql.SQL(", ").join(map(sql.Identifier, keys)),
-                        sql.SQL(", ").join(set_str(columns)),
-                    )
+                    qry = snippet.upsert_snip(table=table, columns=columns, keys=keys)
                     # print(qry.as_string(conn))
                     cur.executemany(query=qry, params_seq=rows)
 
                 else:
                     for row in rows:
-                        qry = sql.SQL(
-                            "INSERT INTO {} ({}) VALUES ({}) ON CONFLICT ({}) DO UPDATE SET {}"
-                        ).format(
-                            sql.Identifier(table),
-                            sql.SQL(", ").join(map(sql.Identifier, tuple(row))),
-                            sql.SQL(", ").join(map(sql.Placeholder, tuple(row))),
-                            # this is technically known as 'conflict target'
-                            sql.SQL(", ").join(map(sql.Identifier, keys)),
-                            sql.SQL(", ").join(set_str(tuple(row))),
+                        # Note tupe(row) returns column keys for each record
+                        qry = snippet.upsert_snip(
+                            table=table, columns=tuple(row), keys=keys
                         )
                         # print(qry.as_string(conn))
                         cur.execute(query=qry, params=row)
@@ -369,35 +308,27 @@ def upsert(
             except errors.InvalidColumnReference as e:
                 print(">>> Error: ", e)
                 print(f"> Creating unique index for {keys}...")
+                # !important, cannot attempt other operations after error unless rollback()
                 conn.rollback()
 
-                # Add unique index & try again
                 try:
-                    uix_name = f'{table}_{"_".join(keys)}_uix'
-                    uix_sql = sql.SQL("CREATE UNIQUE INDEX {} ON {} ({});").format(
-                        sql.Identifier(uix_name),
-                        sql.Identifier(table),
-                        sql.SQL(", ").join(map(sql.Identifier, keys)),
-                    )
-                    # print(idx_sql.as_string(conn))
-
+                    # Create unique index & try upsert again
+                    uix_sql = snippet.create_unique_index(table=table, keys=keys)
+                    print(uix_sql.as_string(conn))
                     cur.execute(query=uix_sql)
 
                     if uniform == 1:
-                        # Now execute previous upsert statement
+                        qry = snippet.upsert_snip(
+                            table=table, columns=columns, keys=keys
+                        )
+                        # print(qry.as_string(conn))
                         cur.executemany(query=qry, params_seq=rows)
 
                     else:
                         for row in rows:
-                            qry = sql.SQL(
-                                "INSERT INTO {} ({}) VALUES ({}) ON CONFLICT ({}) DO UPDATE SET {}"
-                            ).format(
-                                sql.Identifier(table),
-                                sql.SQL(", ").join(map(sql.Identifier, tuple(row))),
-                                sql.SQL(", ").join(map(sql.Placeholder, tuple(row))),
-                                # this is technically known as 'conflict target'
-                                sql.SQL(", ").join(map(sql.Identifier, keys)),
-                                sql.SQL(", ").join(set_str(tuple(row))),
+                            # Note tupe(row) returns column keys for each record
+                            qry = snippet.upsert_snip(
+                                table=table, columns=tuple(row), keys=keys
                             )
                             # print(qry.as_string(conn))
                             cur.execute(query=qry, params=row)
