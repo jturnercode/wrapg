@@ -3,6 +3,15 @@ Wrapper around [_psycopg 3.x_](https://www.psycopg.org/psycopg3/docs/index.html)
 
 Project is in infancy, _work in progress_.
 
+
+## Installing Wrapg
+Wrapg is available on PyPI:
+```
+pip install wrapg
+```
+Wrapg officially supports Python 3.10+.
+
+
 ## Table of Contents
 * [Features](#features)
 * [Setup](#setup)
@@ -23,8 +32,10 @@ Project is in infancy, _work in progress_.
     - see examples for more details *(future)*
 - Upsert, insert_ignore functions included
     - automatically creates index
-    - option to upsert/insert_ignore without creating index (future)
+    - pass sql functions on 'On Conflict' keys (see example)
+    - option to upsert/insert_ignore without creating index *(future)*
 - Copy functions to follow postgres COPY protocol *(today only csv is avail)*
+
 
 ## Setup
 Dependencies:
@@ -34,14 +45,42 @@ Dependencies:
 
 
 ## Usage
-- TODO: add examples later
+- TODO: add more examples later
+
+Before you get started is is recommended to create .env file with below connection parameters.
+Wrapg will auto-import default connectionn parameters and make all functions ready to be executed.  
+The .env file should contain below specific name variables
+```
+# Database config
+PG_HOST = "localhost"
+PG_USER = "postgres"
+PG_PASSWORD = "mypass"
+PG_PORT = 1234
+PG_DBNAME = "sales"
+```
+
+Any connection variable can be overwritten in each function call if needed per [postgres connection parameter key words](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-PARAMKEYWORDS).
+
+Below will overide connection dbname for specific function call.
+```
+qry="SELECT * FROM customer" 
+wrapg.query(raw_sql=qry, conn_kwargs: {'dbname': 'anotherdb'})
+
+```
+
+
+Easily call sql upsert or insert_ignore.  
+The 'keys' parameter represents the on conflict target.
+```
+record = {'name': 'Dave', 'email': 'dave@email.com'}
+wrapg.upsert(data=record, table="customer", keys=["email"])
+```
 
 
 ## Todo
 - Add delete_row, delete funtionality
 - Handle JSON, ITERATOR?
-- Add tests
-- Make into package on pypi
+- Add more tests
 - Optimize code after it is all working
 
 
@@ -51,6 +90,7 @@ This project built on great work by [psycopg 3](https://www.psycopg.org/psycopg3
 
 ## Contact
 Created by [_jturnercode_](https://github.com/jturnercode) - hope package is helps.
+
 
 ## License
 - MIT
