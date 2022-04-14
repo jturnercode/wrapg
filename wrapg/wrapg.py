@@ -22,7 +22,7 @@ from wrapg import util, snippet
 # TODO: Add proper exceptions if parameters are missing or do not work
 # TODO: expose conn_import in init.py as class to easily modify attributes?? vs dict?
 conn_import: dict = {
-    "user": os.environ.get("PG_USERNAME"),
+    "user": os.environ.get("PG_USER"),
     "password": os.environ.get("PG_PASSWORD"),
     "host": os.environ.get("PG_HOST"),
     "dbname": os.environ.get("PG_DBNAME"),

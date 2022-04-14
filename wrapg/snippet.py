@@ -188,7 +188,7 @@ if __name__ == "__main__":
     print("SNIPPET.PY")
 
     conn_import: dict = {
-        "user": os.environ.get("PG_USERNAME"),
+        "user": os.environ.get("PG_USER"),
         "password": os.environ.get("PG_PASSWORD"),
         "host": os.environ.get("PG_HOST"),
         "dbname": os.environ.get("PG_DBNAME"),
