@@ -363,7 +363,7 @@ def upsert_wo_idx():
     for novice users
 """
 
-# ================================= UPDATE ================================
+# ================================= UPDATE Function ================================
 def update(
     data: list[dict] | pd.DataFrame,
     table: str,
@@ -403,7 +403,7 @@ def update(
         # Open a cursor to perform database operations
         with conn.cursor() as cur:
 
-            # Syntax
+            # =================== Update Qry ===================
             # UPDATE table_name
             # SET column1 = value1,
             #     column2 = value2,
@@ -430,7 +430,6 @@ def update(
 
                 return map(set_sql, column_names)
 
-            # =================== Update Qry ==================
             if uniform == 1:
                 # print("> Uniform Data..")
                 qry = sql.SQL("UPDATE {} SET {} WHERE {}").format(
@@ -473,7 +472,6 @@ def create_table(table: str, columns: dict, conn_kwargs: dict = None):
     Returns:
         _type_: None
     """
-    # TODO: Add optional table constriants to function
 
     # Initialize conn_kwargs to empty dict if no arguments passed
     # Merge args into conn_final
@@ -489,6 +487,8 @@ def create_table(table: str, columns: dict, conn_kwargs: dict = None):
         # Open a cursor to perform database operations
         with conn.cursor() as cur:
 
+            # TODO: Add optional table constriants to function
+            # =================== Create Table Qry ===================
             # CREATE TABLE [IF NOT EXISTS] table_name (
             # column1 datatype(length) column_contraint,
             # column2 datatype(length) column_contraint,
@@ -507,14 +507,10 @@ def create_table(table: str, columns: dict, conn_kwargs: dict = None):
                 """
                 # function used to map to column names
                 def col_sql(col, value):
-                    return sql.SQL(f'"{col}" {value.upper()}')
-
-                    # TODO: Could not figure how to escape below? using .format()?
-                    # sql.SQL("{}").format(
-                    # sql.Identifier(col),
-                    # + sql.Literal(" ")
-                    # + sql.Literal(value.upper())
-                    # literal retruns quotes around value, not proper sql
+                    # return sql.SQL(f'"{col}" {value.upper()}')
+                    return sql.SQL("{} {}").format(
+                        sql.Identifier(col), sql.SQL(value.upper())
+                    )
 
                 return [col_sql(k, v) for k, v in column_info.items()]
 
@@ -569,8 +565,10 @@ def copy_from_csv(
         with conn.cursor() as cur:
 
             #! SPECIFIC COLUMNS NOT WORKING; Open ticket with pyscopg?
+            #=================== Copy Qry ===================
             # "COPY cust (name, age) FROM STDIN WITH (FORMAT csv)"
-            # Return composable sql statement
+            
+            # If csv has header
             if header:
                 copy_sql = sql.SQL(
                     "COPY {} FROM STDIN WITH (FORMAT csv, HEADER TRUE)"
@@ -589,7 +587,7 @@ def copy_from_csv(
 
                 with cur.copy(copy_sql) as copy:
 
-                    # using blocks/chunks
+                    # Using blocks/chunks
                     while data := f.read(block_size):
                         copy.write(data)
 
