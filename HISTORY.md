@@ -1,6 +1,14 @@
 # Release History
 
 
+0.2.1 (2022-04-21)
+-------------------
+**Improvements**
+- Add code for delete() which takes dictionary for where clause parmeters
+    - The column name can be wrapped with sql function like upsert and update functions
+- Add clear_table() to quickly clear all data in specified table
+
+
 0.2.0 (2022-04-13)
 -------------------
 **Improvements**
