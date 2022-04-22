@@ -9,4 +9,6 @@ from wrapg.wrapg import (
     upsert,
     insert,
     insert_ignore,
+    delete,
+    clear_table,
 )

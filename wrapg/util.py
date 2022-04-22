@@ -79,6 +79,7 @@ def data_transform(data_structure):
             # rows = tuple(df.itertuples(index=False, name=None))
 
             columns = tuple(data_structure.columns)
+            # in case a df with nan is passed, None needed for sql
             df = data_structure.replace(nan, None)
             rows = df.to_dict(orient="records")
             uniform = 1

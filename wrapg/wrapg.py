@@ -565,9 +565,9 @@ def copy_from_csv(
         with conn.cursor() as cur:
 
             #! SPECIFIC COLUMNS NOT WORKING; Open ticket with pyscopg?
-            #=================== Copy Qry ===================
+            # =================== Copy Qry ===================
             # "COPY cust (name, age) FROM STDIN WITH (FORMAT csv)"
-            
+
             # If csv has header
             if header:
                 copy_sql = sql.SQL(
@@ -596,3 +596,88 @@ def copy_from_csv(
                     # t = [("bill", 50, "here"), ("ronnie", 50, "there")]
                     # for ff in t:
                     #     copy.write_row(ff)
+
+
+# ================================= Delete_where Function ================================
+def delete(table: str, where: dict, conn_kwargs: dict = None):
+    """Function for SQL's Delete.
+
+    Delete rows from the specified table that match 'where' condition, column=value dictionary.
+    Function can accept sql function on the column_name.
+    Note: Use 'clear_table()' if want to delete all records in table.
+
+    Args:
+        table (str): name of database table
+        where (dict): column=value dictionary which specifies rows to be removed.
+        ex. where=dict(name='Matthew', email='fake@email.com')
+        ex. w/sql function where={'customer': 'Ethan', 'MONTH(timestamp_column)': '2'}
+        conn_kwargs (dict, optional): Specify/overide conn kwargs. See full list of options,
+        https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-PARAMKEYWORDS.
+        Defaults to None, recommend importing via .env file.
+    """
+
+    # Initialize conn_kwargs to empty dict if no arguments passed
+    # Merge args into conn_final
+    if conn_kwargs is None:
+        conn_kwargs = {}
+
+    # Final conn parameters to pass to connect()
+    # Set return default type to dictionary, can be overwritten with kwargs
+    conn_final = {**conn_import, **conn_kwargs}
+
+    # Connect to an existing database
+    with psycopg.connect(**conn_final) as conn:
+
+        # Open a cursor to perform database operations
+        with conn.cursor() as cur:
+
+            # =================== Delete Qry ===================
+            # DELETE FROM table_name
+            # WHERE condition---> id = 7 and badge in (2,4)
+            # RETURNING (select_list | *);
+
+            qry = snippet.delete_snip(table=table, where=where)
+            # print(qry.as_string(conn))
+
+            cur.execute(query=qry)
+
+            # Make the changes to the database persistent
+            conn.commit()
+
+
+# ================================= Clear_table Function ================================
+def clear_table(table: str, conn_kwargs: dict = None):
+    """!!Caution!! Function for SQL's Delete used to delete 'ALL' records in specified table.
+    
+    Args:
+        table (str): name of database table
+        conn_kwargs (dict, optional): Specify/overide conn kwargs. See full list of options,
+        https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-PARAMKEYWORDS.
+        Defaults to None, recommend importing via .env file.
+    """
+
+    # Initialize conn_kwargs to empty dict if no arguments passed
+    # Merge args into conn_final
+    if conn_kwargs is None:
+        conn_kwargs = {}
+
+    # Final conn parameters to pass to connect()
+    # Set return default type to dictionary, can be overwritten with kwargs
+    conn_final = {**conn_import, **conn_kwargs}
+
+    # Connect to an existing database
+    with psycopg.connect(**conn_final) as conn:
+
+        # Open a cursor to perform database operations
+        with conn.cursor() as cur:
+
+            # =================== Delete ALL Records Qry ===================
+            # DELETE FROM table_name;
+
+            qry = sql.SQL("DELETE FROM {};").format(sql.Identifier(table))
+            # print(qry.as_string(conn))
+
+            cur.execute(query=qry)
+
+            # Make the changes to the database persistent
+            conn.commit()

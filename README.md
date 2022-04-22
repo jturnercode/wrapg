@@ -1,20 +1,12 @@
 # wrapg
-Wrapper around [_psycopg 3.x_](https://www.psycopg.org/psycopg3/docs/index.html) meant to make easy use of postgres within scripts using simple functions.
+Wrapper around [_psycopg 3.x_](https://www.psycopg.org/psycopg3/docs/index.html) meant to make easy use of postgres using simple python functions. Primary focus is processing python data structures into and out of postgres.
 
 Project is in infancy, _work in progress_.
 
 
-## Installing Wrapg
-Wrapg is available on PyPI:
-```
-pip install wrapg
-```
-Wrapg officially supports Python 3.10+.
-
-
 ## Table of Contents
 * [Features](#features)
-* [Setup](#setup)
+* [Installing Wrapg](#setup)
 * [Usage](#usage)
 * [Todo](#todo)
 * [Acknowledgements](#acknowledgements)
@@ -23,13 +15,13 @@ Wrapg officially supports Python 3.10+.
 
 
 ## Features
-- Simple functions to run postgres sql via python
-- Pass various data structutes into sql functions
+- Simple python functions to run postgres sql via python
+- Pass/Retrieve various python data structutes via underlining sql functions
     - supports pandas dataframe out of box
 - Auto import default postgres connection parameters via .env
     - saves on repeating code to specify connection
     - overide default connection parameters with kwargs in each function
-    - see examples for more details *(future)*
+    - see examples for more details
 - Upsert, insert_ignore functions included
     - automatically creates index
     - pass sql functions on 'On Conflict' keys (see example)
@@ -37,16 +29,22 @@ Wrapg officially supports Python 3.10+.
 - Copy functions to follow postgres COPY protocol *(today only csv is avail)*
 
 
-## Setup
+## Installing Wrapg
+Wrapg is available on PyPI:
+```
+pip install wrapg
+```
+
 Dependencies:
 - python 3.10+
-- [psycopg[binary]>=3.0.11](https://www.psycopg.org/psycopg3/docs/index.html)
-- [pandas>=1.4.2](https://pandas.pydata.org/docs/index.html)
+- [psycopg[binary]>=3.0.11+](https://www.psycopg.org/psycopg3/docs/index.html)
+- [pandas>=1.4.2+](https://pandas.pydata.org/docs/index.html)
 
 
 ## Usage
-- TODO: add more examples later
+TODO: add more examples later
 
+### Connection
 Before you get started is is recommended to create .env file with below connection parameters.
 Wrapg will auto-import default connectionn parameters and make all functions ready to be executed.  
 The .env file should contain below specific name variables
@@ -68,9 +66,9 @@ wrapg.query(raw_sql=qry, conn_kwargs: {'dbname': 'anotherdb'})
 
 ```
 
-
+### Upsert & Insert Ignore
 Easily call sql upsert or insert_ignore.  
-The 'keys' parameter represents the on conflict target.
+The 'keys' parameter represents the on conflict target & will create unique index automatically.
 ```
 record = {'name': 'Dave', 'email': 'dave@email.com'}
 wrapg.upsert(data=record, table="customer", keys=["email"])
@@ -78,7 +76,8 @@ wrapg.upsert(data=record, table="customer", keys=["email"])
 
 
 ## Todo
-- Add delete_row, delete funtionality
+- Handle other operators other than '='; >, <, <>, in, between, like?
+- Implement create_index(), drop_column(), distinct()
 - Handle JSON, ITERATOR?
 - Add more tests
 - Optimize code after it is all working
