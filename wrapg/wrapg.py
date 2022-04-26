@@ -15,12 +15,10 @@ from wrapg import util, snippet
 # Inspired by dataset library that wraps sqlalchemy
 # ================================= TODO ================================
 # TODO: Can query() return explain analyse info?
-# TODO: Conditionally import config?
-# TODO: Implement delete
 # ===========================================================================
 
 # TODO: Add proper exceptions if parameters are missing or do not work
-# TODO: expose conn_import in init.py as class to easily modify attributes?? vs dict?
+# TODO: Expose conn_import in init.py as class to easily modify attributes?? vs dict?
 conn_import: dict = {
     "user": os.environ.get("PG_USER"),
     "password": os.environ.get("PG_PASSWORD"),
@@ -247,6 +245,7 @@ def upsert(
     data: Iterable[dict] | pd.DataFrame,
     table: str,
     keys: list,
+    use_index: bool = True,
     conn_kwargs: dict = None,
 ):
     """Function for SQL's INSERT ON CONFLICT DO UPDATE SET
@@ -289,34 +288,8 @@ def upsert(
             # DO UPDATE SET email=excluded.email
             # WHERE ...;
 
-            try:
-                if uniform == 1:
-                    qry = snippet.upsert_snip(table=table, columns=columns, keys=keys)
-                    # print(qry.as_string(conn))
-                    cur.executemany(query=qry, params_seq=rows)
-
-                else:
-                    for row in rows:
-                        # Note tupe(row) returns column keys for each record
-                        qry = snippet.upsert_snip(
-                            table=table, columns=tuple(row), keys=keys
-                        )
-                        # print(qry.as_string(conn))
-                        cur.execute(query=qry, params=row)
-
-            # Catch no unique index error
-            except errors.InvalidColumnReference as e:
-                print(">>> Error: ", e)
-                print(f"> Creating unique index for {keys}...")
-                # !important, cannot attempt other operations after error unless rollback()
-                conn.rollback()
-
+            if use_index is True:
                 try:
-                    # Create unique index & try upsert again
-                    uix_sql = snippet.create_unique_index(table=table, keys=keys)
-                    print(uix_sql.as_string(conn))
-                    cur.execute(query=uix_sql)
-
                     if uniform == 1:
                         qry = snippet.upsert_snip(
                             table=table, columns=columns, keys=keys
@@ -333,14 +306,47 @@ def upsert(
                             # print(qry.as_string(conn))
                             cur.execute(query=qry, params=row)
 
-                except Exception as indx_error:
-                    print(">>> Error: ", indx_error)
+                # Catch no unique index error
+                except errors.InvalidColumnReference as e:
+                    # print(">>> Error: ", e)
+                    print(f"> Creating unique index for {keys}...")
+                    # !important, cannot attempt other operations after error unless rollback()
+                    conn.rollback()
+
+                    try:
+                        # Create unique index & try upsert again
+                        uix_sql = snippet.create_unique_index(table=table, keys=keys)
+                        # print(uix_sql.as_string(conn))
+                        cur.execute(query=uix_sql)
+
+                        if uniform == 1:
+                            qry = snippet.upsert_snip(
+                                table=table, columns=columns, keys=keys
+                            )
+                            # print(qry.as_string(conn))
+                            cur.executemany(query=qry, params_seq=rows)
+
+                        else:
+                            for row in rows:
+                                # Note tupe(row) returns column keys for each record
+                                qry = snippet.upsert_snip(
+                                    table=table, columns=tuple(row), keys=keys
+                                )
+                                # print(qry.as_string(conn))
+                                cur.execute(query=qry, params=row)
+
+                    except Exception as indx_error:
+                        print(">>> Error: ", indx_error)
+                        quit()
+
+                # Handle all other exceptions
+                except Exception as ee:
+                    print("Exception: ", ee.__init__)
                     quit()
 
-            # Handle all other exceptions
-            except Exception as ee:
-                print("Exception: ", ee.__init__)
-                quit()
+            if use_index is False:
+
+                pass
 
             # Make the changes to the database persistent
             conn.commit()
@@ -369,7 +375,7 @@ def update(
     table: str,
     keys: Iterable,
     conn_kwargs: dict = None,
-):
+) -> int:
     """Function for SQL's UPDATE
 
     If rows with matching keys exist, update row values.
@@ -383,6 +389,9 @@ def update(
         conn_kwargs (dict, optional): Specify/overide conn kwargs. See full list of options,
         https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-PARAMKEYWORDS.
         Defaults to None, recommend importing via .env file.
+    
+    Returns:
+        int: # of updated records
     """
 
     # Inspect data and return columns and rows
@@ -408,51 +417,29 @@ def update(
             # SET column1 = value1,
             #     column2 = value2,
             #     ...
-            # TODO: Where clause is optional, add code if None update all
             # WHERE column = value, ...
             # RETURNING * | output_expression AS output_name;
 
-            # Function to compose col=value sql str
-            def column_value_str(column_names: Iterable):
-                """Create psycopg composable sql string for
-                variable number of columns/value pairs
-                ie column=value scenerios, col=%(col)s
-
-                Args:
-                    column_names (Iterable): column names
-                """
-                # function used to map to column names
-                def set_sql(col):
-                    return sql.SQL("{}={}").format(
-                        sql.Identifier(col),
-                        sql.Placeholder(col),
-                    )
-
-                return map(set_sql, column_names)
-
             if uniform == 1:
                 # print("> Uniform Data..")
-                qry = sql.SQL("UPDATE {} SET {} WHERE {}").format(
-                    sql.Identifier(table),
-                    sql.SQL(", ").join(column_value_str(columns)),
-                    sql.SQL(", ").join(column_value_str(keys)),
-                )
-                # print(qry.as_string(conn))
+                qry = snippet.update_snip(table=table, columns=columns, keys=keys)
 
                 cur.executemany(query=qry, params_seq=rows)
+
+                # Return # of updated records
+                return cur.rowcount
+
             else:
                 # print(">> Non-Uniform Data...")
+                rwcount = 0
                 for row in rows:
-                    qry = sql.SQL("UPDATE {} SET {} WHERE {}").format(
-                        sql.Identifier(table),
-                        sql.SQL(", ").join(column_value_str(tuple(row))),
-                        sql.SQL(", ").join(column_value_str(keys)),
-                    )
+                    qry = snippet.update_snip(table=table, columns=tuple(row), keys=keys)
 
                     cur.execute(query=qry, params=row)
+                    rwcount += cur.rowcount
 
-            # Make the changes to the database persistent
-            conn.commit()
+                # Return # of updated records
+                return rwcount
 
 
 def create_table(table: str, columns: dict, conn_kwargs: dict = None):
@@ -648,7 +635,7 @@ def delete(table: str, where: dict, conn_kwargs: dict = None):
 # ================================= Clear_table Function ================================
 def clear_table(table: str, conn_kwargs: dict = None):
     """!!Caution!! Function for SQL's Delete used to delete 'ALL' records in specified table.
-    
+
     Args:
         table (str): name of database table
         conn_kwargs (dict, optional): Specify/overide conn kwargs. See full list of options,

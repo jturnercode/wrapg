@@ -5,6 +5,7 @@ from psycopg import sql, connect
 
 # Regex to seperate sql_func from column name
 __compiled_pattern = re.compile(pattern=r"\((\w*)\)")
+__compiled_pattern2 = re.compile(pattern=r"(\w*)\((\w*)\)")
 
 
 # =================== Snippet Util Functions ===================
@@ -58,7 +59,8 @@ def colname_snip(column_detail: str | tuple):
     wrapped by sql functions.
 
     Args:
-        column_detail (str | tuple): column_name as str or tuple (sql_func, column_name)
+        column_detail (str | tuple): column_name as str
+        or tuple (sql_func, column_name)
 
     Returns:
         Composed: snippet of sql statment
@@ -185,7 +187,7 @@ def insert_ignore_snip(table: str, columns, keys):
 
 # Note: Seperated from where_snip() to possibly reuse
 # on other dictionaries needing to be composed for other
-# snippets in future 
+# snippets in future
 def compose_key_value(key_value: tuple) -> tuple:
     """Take key_value tuple from dictionary via .items()
     and create a composed key_value tuple for use in creating
@@ -214,6 +216,7 @@ def compose_key_value(key_value: tuple) -> tuple:
         column = result.group(1)
         func = colname.replace(column + ")", "").upper()
 
+        # TODO: cleaner pattern SQL("{}({})"), adjust regex to get func not just colname
         composed_column = sql.SQL("{}{})").format(sql.SQL(func), sql.Identifier(column))
 
         return composed_column, composed_value
@@ -223,10 +226,8 @@ def compose_key_value(key_value: tuple) -> tuple:
     return composed_column, composed_value
 
 
-
-
 # Note: Seperated from compose_key_value() as there
-# may be need for compose other dictionaries in future 
+# may be need for compose other dictionaries in future
 def where_snip(colname_value: tuple):
     """Represent where clause colname=value
 
@@ -248,7 +249,7 @@ def delete_snip(table: str, where: dict):
 
     Args:
         table (str): database table name
-        where (dict): dict(colname=value) that 
+        where (dict): dict(colname=value) that
         filters value to remove from table
 
     Returns:
@@ -264,10 +265,83 @@ def delete_snip(table: str, where: dict):
     )
 
 
+# =================== Update Snippets ===================
+
+def get_sqlfunc_colname(colname: str):
+    """
+    Extract sql function from column name.
+    Return (sql function, column name)
+    If no sql function return None in tuple.
+    Used on Iterable of strings via map().
+
+    Args:
+        colname (str): column name 
+
+    Returns:
+        tuple: (None, colname) or (sqlfunc, colname)
+    """
+    # Check if colname has a function
+    if "(" in colname:
+        try: 
+            # pattern = r"(\w*)\((\w*)\)"
+            result = re.search(__compiled_pattern2, colname)
+
+            # Extract matching values of all groups
+            # this is done to escape column name
+            sqlfunc = result.group(1).upper()
+            colname = result.group(2)
+
+            return sqlfunc, colname
+        except:
+            print('Invalid column name passed!')
+    return None, colname
+
+
+# function used to map to column names
+def colname_placeholder_snip(sqlfunc_colname: tuple):
+
+    """Return sql snip for where and set clauses with
+    placeholder for value;
+    ex. "SET col=value, col2=value2
+    colname=%(colname)s or sqlfun(colname)=%(colname)s
+
+    Args:
+        sqlfunc_colname (tuple): (sqlfunc, colname)
+
+    Returns:
+        Composable: colname=%(colname)s
+    """
+    sqlfunc, colname = sqlfunc_colname
+    if sqlfunc is None:
+        return sql.SQL("{}={}").format(
+            sql.Identifier(colname),
+            sql.Placeholder(colname),
+        )
+    
+    return sql.SQL("{}({})={}").format(
+            sql.SQL(sqlfunc),
+            sql.Identifier(colname),
+            sql.Placeholder(colname),
+        )
+
+
+def update_snip(table: str, columns: Iterable, keys: Iterable):
+    columns = map(get_sqlfunc_colname, columns)
+    keys = map(get_sqlfunc_colname, keys)
+
+    return sql.SQL("UPDATE {} SET {} WHERE {}").format(
+        sql.Identifier(table),
+        sql.SQL(", ").join(map(colname_placeholder_snip, columns)),
+        sql.SQL(", ").join(map(colname_placeholder_snip, keys)),
+    )
+
+
+
 if __name__ == "__main__":
     # dev testing, remove later
     import os
     from timeit import timeit
+
     # print("SNIPPET.PY")
 
     conn_import: dict = {
@@ -284,24 +358,23 @@ if __name__ == "__main__":
         dtest = {"name": "bos", "age": 34, "Date(ts)": "2022-04-19"}
         # dtest = {"name": "bos", "age": 34, "ts": "2022-04-19"}
 
-        
-
         # tests
         # snipp = extract_sqlfunc_colname("Date(ts)")
         # snipp = create_unique_index("mytable", ["name", "Date(ts)"])
-        
+
         # timeit(delete_snip, "mytable", dtest)
         # def a():
-            # snipp = delete_snip("mytable", dtest)
-            # print(snipp.as_string(conn))
+        # snipp = delete_snip("mytable", dtest)
+        # print(snipp.as_string(conn))
 
-        snipp = delete_snip("mytable", dtest)
+        # snipp = delete_snip("mytable", dtest)
+
+        snipp = update_snip(table='mytable', columns=['a', 'b', 'c'], keys=['Date(b)', 'd'])
         print(snipp.as_string(conn))
 
         # Code used to time speed of functions
         # print(timeit(stmt='delete_snip("mytable", dtest)', number=1000, globals=globals())/1000)
         # print(timeit(stmt='delete_snip("mytable", dtest)', setup='from __main__ import delete_snip, dtest', number=1))
         # print(timeit(stmt='a()', setup='from __main__ import a', number=100))
-        
 
         conn.close()
