@@ -29,32 +29,7 @@ def check_for_func(sequence: Iterable) -> bool:
     return "(" in combined
 
 
-def extract_sqlfunc_colname(column_name: str):
-    """If sql function passed with column name,
-    seperate function from column name.
-    ie Date(ts) -> (Date(, ts)
-
-    Args:
-        column_name (str): _description_
-
-    Returns:
-        str or tuple: column_name or tuple of func, column_name
-    """
-
-    # pattern = r"\((\w*)\)"
-    result = re.search(__compiled_pattern, column_name)
-
-    # Extract matching values of all groups
-    if result:
-        column = result.group(1)
-        func = column_name.replace(column + ")", "").upper()
-        return func, column
-
-    # if no '(' return original column name
-    return column_name
-
-
-def colname_snip(column_detail: str | tuple):
+def colname_snip(sqlfunc_colname: tuple):
     """Return escaped sql snippet, accomodate column names
     wrapped by sql functions.
 
@@ -65,16 +40,18 @@ def colname_snip(column_detail: str | tuple):
     Returns:
         Composed: snippet of sql statment
     """
-    # return escaped column name
-    if isinstance(column_detail, str):
-        return sql.SQL("{}").format(
-            sql.Identifier(column_detail),
+    sqlfunc, colname = sqlfunc_colname
+
+    # return snippet of sql func wrapping column name
+    if sqlfunc is None:
+        return sql.SQL("{}({})").format(
+            sql.SQL(sqlfunc),
+            sql.Identifier(colname),
         )
 
-    # else if tuple return snippet if sql func wrapping column
-    return sql.SQL("{}{})").format(
-        sql.SQL(column_detail[0]),
-        sql.Identifier(column_detail[1]),
+    # return escaped column name
+    return sql.SQL("{}").format(
+        sql.Identifier(colname),
     )
 
 
@@ -87,20 +64,20 @@ def create_unique_index(table, keys):
     # unique index name
     uix_name = f'{table}_{"_".join(keys)}_uix'
 
-    # if sql function in the any key
+    # If sql function in the any key
     if check_for_func(keys):
 
-        # Return tuple of functions and key else just key
-        seperated_keys = map(extract_sqlfunc_colname, keys)
+        # Return tuple of (sql func, colname)
+        sqlfunc_keys = map(get_sqlfunc_colname, keys)
 
         # sql snippet to create unique index
         return sql.SQL("CREATE UNIQUE INDEX {} ON {} ({});").format(
             sql.Identifier(uix_name),
             sql.Identifier(table),
-            sql.SQL(", ").join(map(colname_snip, seperated_keys)),
+            sql.SQL(", ").join(map(colname_snip, sqlfunc_keys)),
         )
 
-    # sql snippet to create unique index
+    # Sql snippet to create unique index
     return sql.SQL("CREATE UNIQUE INDEX {} ON {} ({});").format(
         sql.Identifier(uix_name),
         sql.Identifier(table),
@@ -123,9 +100,10 @@ def upsert_snip(table: str, columns, keys):
     # if sql function in the any key
     if check_for_func(keys):
 
-        # Return tuple of (function, key) else just key
-        func_keys = map(extract_sqlfunc_colname, keys)
+        # Return tuple of (sql func, key)
+        sqlfunc_keys = map(get_sqlfunc_colname, keys)
 
+        # Sql snippet to upsert
         return sql.SQL(
             "INSERT INTO {} ({}) VALUES ({}) ON CONFLICT ({}) DO UPDATE SET {}"
         ).format(
@@ -133,11 +111,12 @@ def upsert_snip(table: str, columns, keys):
             sql.SQL(", ").join(map(sql.Identifier, columns)),
             sql.SQL(", ").join(map(sql.Placeholder, columns)),
             # conflict target
-            sql.SQL(", ").join(map(colname_snip, func_keys)),
+            sql.SQL(", ").join(map(colname_snip, sqlfunc_keys)),
             # set new values
             sql.SQL(", ").join(map(exclude_sql, columns)),
         )
 
+    # Sql snippet to upsert
     return sql.SQL(
         "INSERT INTO {} ({}) VALUES ({}) ON CONFLICT ({}) DO UPDATE SET {}"
     ).format(
@@ -156,12 +135,13 @@ def upsert_snip(table: str, columns, keys):
 
 def insert_ignore_snip(table: str, columns, keys):
 
-    # if sql function in the any key
+    # If sql function in the any key
     if check_for_func(keys):
 
-        # Return tuple of functions and key else just key
-        seperated_keys = map(extract_sqlfunc_colname, keys)
+        # Return tuple (sql func, key)
+        sqlfunc_keys = map(get_sqlfunc_colname, keys)
 
+        # Sql snippet to insert ignore
         return sql.SQL(
             "INSERT INTO {} ({}) VALUES ({}) ON CONFLICT ({}) DO NOTHING"
         ).format(
@@ -169,9 +149,10 @@ def insert_ignore_snip(table: str, columns, keys):
             sql.SQL(", ").join(map(sql.Identifier, columns)),
             sql.SQL(", ").join(map(sql.Placeholder, columns)),
             # conflict target
-            sql.SQL(", ").join(map(colname_snip, seperated_keys)),
+            sql.SQL(", ").join(map(colname_snip, sqlfunc_keys)),
         )
 
+    # Sql snippet to insert ignore
     return sql.SQL(
         "INSERT INTO {} ({}) VALUES ({}) ON CONFLICT ({}) DO NOTHING"
     ).format(
@@ -267,6 +248,7 @@ def delete_snip(table: str, where: dict):
 
 # =================== Update Snippets ===================
 
+
 def get_sqlfunc_colname(colname: str):
     """
     Extract sql function from column name.
@@ -275,14 +257,14 @@ def get_sqlfunc_colname(colname: str):
     Used on Iterable of strings via map().
 
     Args:
-        colname (str): column name 
+        colname (str): column name
 
     Returns:
         tuple: (None, colname) or (sqlfunc, colname)
     """
     # Check if colname has a function
     if "(" in colname:
-        try: 
+        try:
             # pattern = r"(\w*)\((\w*)\)"
             result = re.search(__compiled_pattern2, colname)
 
@@ -293,7 +275,7 @@ def get_sqlfunc_colname(colname: str):
 
             return sqlfunc, colname
         except:
-            print('Invalid column name passed!')
+            print("Invalid column name passed!")
     return None, colname
 
 
@@ -317,12 +299,12 @@ def colname_placeholder_snip(sqlfunc_colname: tuple):
             sql.Identifier(colname),
             sql.Placeholder(colname),
         )
-    
+
     return sql.SQL("{}({})={}").format(
-            sql.SQL(sqlfunc),
-            sql.Identifier(colname),
-            sql.Placeholder(colname),
-        )
+        sql.SQL(sqlfunc),
+        sql.Identifier(colname),
+        sql.Placeholder(colname),
+    )
 
 
 def update_snip(table: str, columns: Iterable, keys: Iterable):
@@ -334,7 +316,6 @@ def update_snip(table: str, columns: Iterable, keys: Iterable):
         sql.SQL(", ").join(map(colname_placeholder_snip, columns)),
         sql.SQL(", ").join(map(colname_placeholder_snip, keys)),
     )
-
 
 
 if __name__ == "__main__":
@@ -359,7 +340,6 @@ if __name__ == "__main__":
         # dtest = {"name": "bos", "age": 34, "ts": "2022-04-19"}
 
         # tests
-        # snipp = extract_sqlfunc_colname("Date(ts)")
         # snipp = create_unique_index("mytable", ["name", "Date(ts)"])
 
         # timeit(delete_snip, "mytable", dtest)
@@ -369,7 +349,9 @@ if __name__ == "__main__":
 
         # snipp = delete_snip("mytable", dtest)
 
-        snipp = update_snip(table='mytable', columns=['a', 'b', 'c'], keys=['Date(b)', 'd'])
+        snipp = update_snip(
+            table="mytable", columns=["a", "b", "c"], keys=["Date(b)", "d"]
+        )
         print(snipp.as_string(conn))
 
         # Code used to time speed of functions
