@@ -4,8 +4,7 @@ from psycopg import sql, connect
 
 
 # Regex to seperate sql_func from column name
-__compiled_pattern = re.compile(pattern=r"\((\w*)\)")
-__compiled_pattern2 = re.compile(pattern=r"(\w*)\((\w*)\)")
+__compiled_pattern = re.compile(pattern=r"(\w*)\((\w*)\)")
 
 
 # =================== Snippet Util Functions ===================
@@ -189,16 +188,15 @@ def compose_key_value(key_value: tuple) -> tuple:
 
     # Check if colname has a function
     if "(" in colname:
-        # pattern = r"\((\w*)\)"
+        # pattern = r"(\w*)\((\w*)\)"
         result = re.search(__compiled_pattern, colname)
 
         # Extract matching values of all groups
         # this is done to escape column name
-        column = result.group(1)
-        func = colname.replace(column + ")", "").upper()
+        sqlfunc = result.group(1).upper()
+        column = result.group(2)
 
-        # TODO: cleaner pattern SQL("{}({})"), adjust regex to get func not just colname
-        composed_column = sql.SQL("{}{})").format(sql.SQL(func), sql.Identifier(column))
+        composed_column = sql.SQL("{}({})").format(sql.SQL(sqlfunc), sql.Identifier(column))
 
         return composed_column, composed_value
 
@@ -266,7 +264,7 @@ def get_sqlfunc_colname(colname: str):
     if "(" in colname:
         try:
             # pattern = r"(\w*)\((\w*)\)"
-            result = re.search(__compiled_pattern2, colname)
+            result = re.search(__compiled_pattern, colname)
 
             # Extract matching values of all groups
             # this is done to escape column name
