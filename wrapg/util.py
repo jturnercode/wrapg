@@ -3,13 +3,33 @@ import pandas as pd
 from numpy import nan
 
 
-def uniform_data(iter_dict: Iterable[dict]) -> int:
+def check_all_dicts(iterable_dict: Iterable[dict]):
+    """Check if Iterable contains all dictionaries
+
+    Args:
+        iterable_dict (Iterable[dict]): Iterable of dictionaries
     """
-    Function evaluates if list of dictionaries
-    has uniform keys for each dictionary.
+    # Check if dict
+    def check_dict(d):
+        return isinstance(d, dict)
+
+    # Check if all instances are type dict, return True or False
+    all_dict = all(map(check_dict, iterable_dict))
+    # print(all_dict)
+
+    if not all_dict:
+        raise BaseException("Iterable has mixed types, expected Iterable[dictionaries]")
+
+    return True
+
+
+def uniform_dict_keys(iterable_dict: Iterable[dict]) -> int:
+    """
+    Function evaluates if Iterable of dictionaries
+    has same keys for each dictionary.
     If true, this will allow for one query
     to process data. ie one query to insert/update/etc
-    many rows vs having to create a query
+    all rows vs having to create a query
     for each dictionary (non uniform key/pair data)
 
     Args:
@@ -21,24 +41,16 @@ def uniform_data(iter_dict: Iterable[dict]) -> int:
      then this indicates all dicts in list
      have the same keys (uniform)
     """
-    # Check if dict
-    def check_dict(d):
-        return isinstance(d, dict)
 
-    # Check if all instances are type dict
-    all_dict = all(map(check_dict, iter_dict))
-    # print(all_dict)
-
-    if not all_dict:
-        raise BaseException("Iterable has mixed types, expected Iterable[dictionaries]")
-
-    def tup_sort(dict) -> tuple:
-        """Return sorted tuple of keys for each dict"""
+    def key_sort(dict) -> tuple:
+        """Return sorted dictionary keys for each dict"""
         # sorted(dict) returns keys
-        # need tuple to process set()
+        # Need a tuple to process set()
         return tuple(sorted(dict))
 
-    keys = set(map(tup_sort, iter_dict))
+    # Compare all tuples of keys and apply set() to identify unique key combinations
+    # If len(set) = 1, then all keys same for all dictionaries->uniform data structure
+    keys = set(map(key_sort, iterable_dict))
 
     return len(keys)
 
@@ -81,6 +93,7 @@ def data_transform(data_structure):
             columns = tuple(data_structure.columns)
             # in case a df with nan is passed, None needed for sql
             df = data_structure.replace(nan, None)
+            # returns list of dictionaries
             rows = df.to_dict(orient="records")
             uniform = 1
 
@@ -100,12 +113,18 @@ def data_transform(data_structure):
             # df = df.replace(nan, None)
             # rows = list(df.itertuples(index=False, name=None))
 
-            # return tuple(dict.keys of first instance in Iterable)
-            columns = tuple(data_structure[0])
-            # uniform_data also confirms Iterable[dict] else throws error
-            uniform = uniform_data(data_structure)
+            # Check all instances in data structure are dictionaires
+            if check_all_dicts(data_structure):
 
-            return columns, data_structure, uniform
+                # Return tuple(dict.keys of first instance in Iterable)
+                # If not uniform program will iterate over instance
+                # if uniform, checking first instance is good enough
+                columns = tuple(data_structure[0])
+
+                # Check if all dictionaries have same keys
+                uniform = uniform_dict_keys(data_structure)
+
+                return columns, data_structure, uniform
 
         case dict():
             # print("type -> dictionary")
