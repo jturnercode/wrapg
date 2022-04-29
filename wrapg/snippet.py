@@ -43,13 +43,13 @@ def colname_snip(sqlfunc_colname: tuple):
 
     # return snippet of sql func wrapping column name
     if sqlfunc is None:
-        return sql.SQL("{}({})").format(
-            sql.SQL(sqlfunc),
+        # return escaped column name
+        return sql.SQL("{}").format(
             sql.Identifier(colname),
         )
 
-    # return escaped column name
-    return sql.SQL("{}").format(
+    return sql.SQL("{}({})").format(
+        sql.SQL(sqlfunc),
         sql.Identifier(colname),
     )
 
@@ -94,7 +94,7 @@ def exclude_sql(col):
     )
 
 
-def upsert_snip(table: str, columns, keys):
+def upsert_snip(table: str, columns: Iterable, keys: Iterable):
 
     # if sql function in the any key
     if check_for_func(keys):
@@ -104,7 +104,7 @@ def upsert_snip(table: str, columns, keys):
 
         # Sql snippet to upsert
         return sql.SQL(
-            "INSERT INTO {} ({}) VALUES ({}) ON CONFLICT ({}) DO UPDATE SET {}"
+            "INSERT INTO {} ({}) VALUES ({}) ON CONFLICT ({}) DO UPDATE SET {};"
         ).format(
             sql.Identifier(table),
             sql.SQL(", ").join(map(sql.Identifier, columns)),
@@ -117,7 +117,7 @@ def upsert_snip(table: str, columns, keys):
 
     # Sql snippet to upsert
     return sql.SQL(
-        "INSERT INTO {} ({}) VALUES ({}) ON CONFLICT ({}) DO UPDATE SET {}"
+        "INSERT INTO {} ({}) VALUES ({}) ON CONFLICT ({}) DO UPDATE SET {};"
     ).format(
         sql.Identifier(table),
         sql.SQL(", ").join(map(sql.Identifier, columns)),
@@ -196,7 +196,9 @@ def compose_key_value(key_value: tuple) -> tuple:
         sqlfunc = result.group(1).upper()
         column = result.group(2)
 
-        composed_column = sql.SQL("{}({})").format(sql.SQL(sqlfunc), sql.Identifier(column))
+        composed_column = sql.SQL("{}({})").format(
+            sql.SQL(sqlfunc), sql.Identifier(column)
+        )
 
         return composed_column, composed_value
 
