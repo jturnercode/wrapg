@@ -314,7 +314,7 @@ def update_snip(table: str, columns: Iterable, keys: Iterable):
     return sql.SQL("UPDATE {} SET {} WHERE {}").format(
         sql.Identifier(table),
         sql.SQL(", ").join(map(colname_placeholder_snip, columns)),
-        sql.SQL(", ").join(map(colname_placeholder_snip, keys)),
+        sql.SQL(" AND ").join(map(colname_placeholder_snip, keys)),
     )
 
 

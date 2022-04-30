@@ -60,7 +60,7 @@ def test_update_snip():
             keys=["name", "Date(ts)"],
         )
 
-        compare = 'UPDATE "mytable" SET "name"=%(name)s, "age"=%(age)s, "location"=%(location)s WHERE "name"=%(name)s, DATE("ts")=%(ts)s'
+        compare = 'UPDATE "mytable" SET "name"=%(name)s, "age"=%(age)s, "location"=%(location)s WHERE "name"=%(name)s AND DATE("ts")=%(ts)s'
         assert snipp.as_string(conn) == compare
 
         conn.close()
