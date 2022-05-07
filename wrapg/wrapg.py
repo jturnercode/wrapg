@@ -110,31 +110,29 @@ def insert(data: Iterable[dict] | pd.DataFrame, table: str, conn_kwargs: dict = 
 
             if uniform == 1:
                 # Dynamic insert query for dictionaries
-                qry = sql.SQL("INSERT INTO {} ({}) VALUES ({})").format(
-                    sql.Identifier(table),
-                    sql.SQL(", ").join(map(sql.Identifier, columns)),
-                    sql.SQL(", ").join(map(sql.Placeholder, columns)),
-                    # Dynamic insert query for list of tuples
-                    # sql.SQL(", ").join(sql.Placeholder() * len(columns)),
-                )
-                # print(qry.as_string(conn))
+                insert_qry = snippet.insert_snip(table=table, columns=columns)
+                # print(insert_qry.as_string(conn))
+
                 # One insert for all dictionaries
-                cur.executemany(query=qry, params_seq=rows)
+                cur.executemany(query=insert_qry, params_seq=rows)
+
+                # Return # of inserted records
+                return cur.rowcount
 
             else:
+                rw_count = 0
                 # For non uniform data
                 for row in rows:
                     # Dynamic insert query for dictionaries
-                    qry = sql.SQL("INSERT INTO {} ({}) VALUES ({})").format(
-                        sql.Identifier(table),
-                        sql.SQL(", ").join(map(sql.Identifier, tuple(row))),
-                        sql.SQL(", ").join(map(sql.Placeholder, tuple(row))),
-                    )
-                    # Seperate insert for each dictionary
-                    cur.execute(query=qry, params=row)
+                    insert_qry = snippet.insert_snip(table=table, columns=tuple(row))
 
-            # Make the changes to the database persistent
-            conn.commit()
+                    # Seperate insert for each dictionary
+                    cur.execute(query=insert_qry, params=row)
+                    rw_count += cur.rowcount
+
+                return rw_count
+
+
 
 
 def insert_ignore(
@@ -257,7 +255,8 @@ def upsert(
     Args:
         data (Iterable[dict] | pd.DataFrame): data in form of dict, list of dict, or dataframe
         table (str): name of database table
-        keys (list): Iterable of columns
+        keys (list): Iterable of column names
+        use_index (bool): If False first try to update then insert without use of an index
         conn_kwargs (dict, optional): Specify/overide conn kwargs. See full list of options,
         https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-PARAMKEYWORDS.
         Defaults to None, recommend importing via .env file.
@@ -290,14 +289,18 @@ def upsert(
 
             if use_index is True:
                 try:
+                    # Process uniform data
                     if uniform == 1:
                         qry = snippet.upsert_snip(
                             table=table, columns=columns, keys=keys
                         )
                         # print(qry.as_string(conn))
                         cur.executemany(query=qry, params_seq=rows)
+                        return cur.rowcount
 
+                    # Process Non-Uniform Data
                     else:
+                        rw_count = 0
                         for row in rows:
                             # Note tupe(row) returns column keys for each record
                             qry = snippet.upsert_snip(
@@ -305,28 +308,35 @@ def upsert(
                             )
                             # print(qry.as_string(conn))
                             cur.execute(query=qry, params=row)
+                            rw_count += cur.rowcount
+                        return rw_count
 
                 # Catch no unique index error
+                # TODO: Can i check if index exist rather than using error
                 except errors.InvalidColumnReference as e:
                     # print(">>> Error: ", e)
-                    print(f"> Creating unique index for {keys}...")
-                    # !important, cannot attempt other operations after error unless rollback()
+                    # print(f"> Creating unique index for {keys}...")
+                    # !Important, cannot attempt other operations after error unless rollback()
                     conn.rollback()
 
+                    # Create unique index & try upsert again
                     try:
-                        # Create unique index & try upsert again
                         uix_sql = snippet.create_unique_index(table=table, keys=keys)
                         # print(uix_sql.as_string(conn))
                         cur.execute(query=uix_sql)
 
+                        # Process Uniform data
                         if uniform == 1:
                             qry = snippet.upsert_snip(
                                 table=table, columns=columns, keys=keys
                             )
                             # print(qry.as_string(conn))
                             cur.executemany(query=qry, params_seq=rows)
+                            return cur.rowcount
 
+                        # Process Non-uniform data
                         else:
+                            rw_count = 0
                             for row in rows:
                                 # Note tupe(row) returns column keys for each record
                                 qry = snippet.upsert_snip(
@@ -334,6 +344,9 @@ def upsert(
                                 )
                                 # print(qry.as_string(conn))
                                 cur.execute(query=qry, params=row)
+                                rw_count += cur.rowcount
+
+                            return rw_count
 
                     except Exception as indx_error:
                         print(">>> Error: ", indx_error)
@@ -346,28 +359,74 @@ def upsert(
 
             if use_index is False:
 
-                pass
+                # If use_index is False
+                # First attempt to update data, confirm result
+                # If no update, then insert record
 
-            # Make the changes to the database persistent
-            conn.commit()
+                # Process uniform data without index
+                if uniform == 1:
 
+                    # Update qry for uniform data
+                    update_qry = snippet.update_snip(
+                        table=table, columns=columns, keys=keys
+                    )
+                    cur.executemany(query=update_qry, params_seq=rows)
 
-"""
-# TODO: **upsert without creating auto-index or constriants
-**Add as option to exisiting upsert(auto_uix=False)
-def upsert_wo_idx():
-    Sudo code
-    This function would be run inside a for loop within a transaction
-    every iteration would result in a update or an insert
+                    # if all records updated, finish return # of updated records
+                    if cur.rowcount == len(rows):
+                        # print("All records updated, uniform")
+                        return cur.rowcount
 
-    try:
-        update() on keys
-        if update() return value is 0
-        then insert()
-    this code should be much slower but not require creating
-    unique constriants which may be hard to manage especially
-    for novice users
-"""
+                    # Dynamic insert query for dictionaries
+                    insert_qry = snippet.insert_snip(table=table, columns=columns)
+
+                    # Insert all records (no records can be updated)
+                    if cur.rowcount == 0:
+                        # One insert for all dictionaries
+                        cur.executemany(query=insert_qry, params_seq=rows)
+                        # print("All records inserted, uniform")
+
+                        return cur.rowcount
+
+                    # Update or Insert new records need to be inserted
+                    rw_count = 0
+                    # print("Records updated & inserted, uniform")
+                    for row in rows:
+                        # Update single record
+                        cur.execute(query=update_qry, params=row)
+                        rw_count += cur.rowcount
+
+                        # if no update then insert record
+                        if cur.rowcount == 0:
+                            cur.execute(query=insert_qry, params=row)
+                            rw_count += cur.rowcount
+
+                    # total records updated or inserted
+                    return rw_count
+
+                # Process Non-uniform data without index
+                else:
+                    # print("Records updated & inserted, Non-uniform")
+                    rw_count = 0
+                    for row in rows:
+                        # Update qry for uniform data
+                        update_qry = snippet.update_snip(
+                            table=table, columns=tuple(row), keys=keys
+                        )
+                        # print(update_qry.as_string(conn))
+                        cur.execute(query=update_qry, params=row)
+                        rw_count += cur.rowcount
+
+                        # if no update then insert record
+                        if cur.rowcount == 0:
+
+                            # Dynamic insert query for dictionaries
+                            insert_qry = snippet.insert_snip(table=table, columns=tuple(row))
+                            cur.execute(query=insert_qry, params=row)
+
+                            rw_count += cur.rowcount
+                    return rw_count
+
 
 # ================================= UPDATE Function ================================
 def update(
@@ -389,7 +448,7 @@ def update(
         conn_kwargs (dict, optional): Specify/overide conn kwargs. See full list of options,
         https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-PARAMKEYWORDS.
         Defaults to None, recommend importing via .env file.
-    
+
     Returns:
         int: # of updated records
     """
@@ -423,7 +482,7 @@ def update(
             if uniform == 1:
                 # print("> Uniform Data..")
                 qry = snippet.update_snip(table=table, columns=columns, keys=keys)
-
+                print(qry.as_string(conn))
                 cur.executemany(query=qry, params_seq=rows)
 
                 # Return # of updated records
@@ -433,8 +492,11 @@ def update(
                 # print(">> Non-Uniform Data...")
                 rwcount = 0
                 for row in rows:
-                    qry = snippet.update_snip(table=table, columns=tuple(row), keys=keys)
+                    qry = snippet.update_snip(
+                        table=table, columns=tuple(row), keys=keys
+                    )
 
+                    print(qry.as_string(conn))  
                     cur.execute(query=qry, params=row)
                     rwcount += cur.rowcount
 
