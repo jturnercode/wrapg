@@ -325,6 +325,13 @@ def update_snip(table: str, columns: Iterable, keys: Iterable):
         sql.SQL(" AND ").join(map(colname_placeholder_snip, keys)),
     )
 
+def insert_snip(table: str, columns: Iterable):
+
+    return sql.SQL("INSERT INTO {} ({}) VALUES ({})").format(
+                        sql.Identifier(table),
+                        sql.SQL(", ").join(map(sql.Identifier, columns)),
+                        sql.SQL(", ").join(map(sql.Placeholder, columns)),
+                    )
 
 if __name__ == "__main__":
     # dev testing, remove later
