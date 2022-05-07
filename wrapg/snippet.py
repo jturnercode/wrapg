@@ -2,7 +2,7 @@ import re
 from typing import Iterable
 from psycopg import sql, connect
 
-
+# TODO: today use date() to type cast; change regex to '::' for type cast vs '()' for true funcs
 # Regex to seperate sql_func from column name
 __compiled_pattern = re.compile(pattern=r"(\w*)\((\w*)\)")
 
@@ -279,7 +279,7 @@ def get_sqlfunc_colname(colname: str):
     return None, colname
 
 
-# function used to map to column names
+# function used to map passed dictionary values to column names
 def colname_placeholder_snip(sqlfunc_colname: tuple):
 
     """Return sql snip for where and set clauses with
@@ -299,11 +299,19 @@ def colname_placeholder_snip(sqlfunc_colname: tuple):
             sql.Identifier(colname),
             sql.Placeholder(colname),
         )
+    # KEEP FOR NOW IN CASE WANT TO PROCESS TRUE FUNCTIONS VS TYPE CAST FUNCTIONS
+    # return sql.SQL("{}({})={}").format(
+    #     sql.SQL(sqlfunc),
+    #     sql.Identifier(colname),
+    #     sql.Placeholder(colname),
+    # )
 
-    return sql.SQL("{}({})={}").format(
-        sql.SQL(sqlfunc),
+    # type cast if func found, Update future to handle better
+    return sql.SQL("{}::{}={}::{}").format(
         sql.Identifier(colname),
+        sql.SQL(sqlfunc),
         sql.Placeholder(colname),
+        sql.SQL(sqlfunc),
     )
 
 
@@ -311,7 +319,7 @@ def update_snip(table: str, columns: Iterable, keys: Iterable):
     columns = map(get_sqlfunc_colname, columns)
     keys = map(get_sqlfunc_colname, keys)
 
-    return sql.SQL("UPDATE {} SET {} WHERE {}").format(
+    return sql.SQL("UPDATE {} SET {} WHERE {};").format(
         sql.Identifier(table),
         sql.SQL(", ").join(map(colname_placeholder_snip, columns)),
         sql.SQL(" AND ").join(map(colname_placeholder_snip, keys)),
