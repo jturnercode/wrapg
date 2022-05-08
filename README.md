@@ -25,7 +25,7 @@ Project is in infancy, _work in progress_.
 - Upsert, insert_ignore functions included
     - automatically creates index
     - pass sql functions on 'On Conflict' keys (see example)
-    - option to upsert/insert_ignore without creating index *(future)*
+    - use option 'use_index=False' to upsert without using index 
 - Copy functions to follow postgres COPY protocol *(today only csv is avail)*
 
 
@@ -77,6 +77,7 @@ wrapg.upsert(data=record, table="customer", keys=["email"])
 
 ## Todo
 - Handle other operators other than '='; >, <, <>, in, between, like?
+- insert_ignore() without index
 - Implement create_index(), drop_column(), distinct()
 - Handle JSON, ITERATOR?
 - Add more tests

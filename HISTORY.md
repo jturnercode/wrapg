@@ -1,5 +1,17 @@
 # Release History
 
+0.2.2 (2022-05-07)
+-------------------
+**Improvements**
+- Add insert_snip() to resuse insert code
+- Improve regex to better detect functions in column
+- Add 'use_index' to upsert(); set to False to upsert without use of unique index
+- Add more tests on util.py and snippet.py
+
+**Bugfixes**
+- Fix sqlfunc() to properly cast a timestamp to date()
+- Fix update() with ' AND '
+
 
 0.2.1 (2022-04-21)
 -------------------
