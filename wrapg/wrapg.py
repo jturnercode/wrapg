@@ -28,7 +28,7 @@ conn_import: dict = {
 }
 
 
-def query(raw_sql: str, to_df=False, conn_kwargs: dict = None):
+def query(raw_sql: str, to_df: bool = False, conn_kwargs: dict = None):
     """Function to send raw sql query to postgres db.
 
     Args:
@@ -133,8 +133,6 @@ def insert(data: Iterable[dict] | pd.DataFrame, table: str, conn_kwargs: dict = 
                 return rw_count
 
 
-
-
 def insert_ignore(
     data: Iterable[dict] | pd.DataFrame,
     table: str,
@@ -189,6 +187,9 @@ def insert_ignore(
                     )
                     # print(qry.as_string(conn))
                     cur.executemany(query=qry, params_seq=rows)
+
+                    # TODO: add return count and test for all cases
+                    # return cur.rowcount
 
                 else:
                     for row in rows:
@@ -421,7 +422,9 @@ def upsert(
                         if cur.rowcount == 0:
 
                             # Dynamic insert query for dictionaries
-                            insert_qry = snippet.insert_snip(table=table, columns=tuple(row))
+                            insert_qry = snippet.insert_snip(
+                                table=table, columns=tuple(row)
+                            )
                             cur.execute(query=insert_qry, params=row)
 
                             rw_count += cur.rowcount
@@ -496,7 +499,7 @@ def update(
                         table=table, columns=tuple(row), keys=keys
                     )
 
-                    print(qry.as_string(conn))  
+                    print(qry.as_string(conn))
                     cur.execute(query=qry, params=row)
                     rwcount += cur.rowcount
 
