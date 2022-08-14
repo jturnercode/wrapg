@@ -2,10 +2,11 @@ import os
 from psycopg import connect
 from wrapg import snippet
 
+
 # Note: run test using -m flag
-# pipenv run python -m pytest
+# pipenv run python -m pytest -v
 
-
+# TODO: update to a test db vs main app db
 conn_import: dict = {
     "user": os.environ.get("PG_USER"),
     "password": os.environ.get("PG_PASSWORD"),
@@ -13,7 +14,6 @@ conn_import: dict = {
     "dbname": os.environ.get("PG_DBNAME"),
     "port": os.environ.get("PG_PORT"),
 }
-
 
 
 def test_create_index_snip():
@@ -24,7 +24,8 @@ def test_create_index_snip():
 
         assert (
             snipp.as_string(conn)
-            == 'CREATE UNIQUE INDEX "mytable_name_Date(ts)_uix" ON "mytable" ("name", DATE("ts"));'
+            # == 'CREATE UNIQUE INDEX "mytable_name_Date(ts)_uix" ON "mytable" ("name", DATE("ts"));'
+            == 'CREATE UNIQUE INDEX "mytable_name_Date(ts)_uix" ON "mytable" ("name", "ts"::DATE);'
         )
 
         conn.close()
@@ -41,8 +42,18 @@ def test_upsert_snip():
             columns=(("name", "age", "location")),
             keys=["name", "Date(ts)"],
         )
+        # function type syntax, keep for future use
+        # compare = (
+        # 'INSERT INTO "mytable" ("name", "age", "location")'
+        # ' VALUES (%(name)s, %(age)s, %(location)s) ON CONFLICT ("name", DATE("ts"))'
+        # ' DO UPDATE SET "name"=EXCLUDED."name", "age"=EXCLUDED."age", "location"=EXCLUDED."location";')
 
-        compare = 'INSERT INTO "mytable" ("name", "age", "location") VALUES (%(name)s, %(age)s, %(location)s) ON CONFLICT ("name", DATE("ts")) DO UPDATE SET "name"=EXCLUDED."name", "age"=EXCLUDED."age", "location"=EXCLUDED."location";'
+        # type cast syntax
+        compare = (
+            'INSERT INTO "mytable" ("name", "age", "location")'
+            ' VALUES (%(name)s, %(age)s, %(location)s) ON CONFLICT ("name", "ts"::DATE)'
+            ' DO UPDATE SET "name"=EXCLUDED."name", "age"=EXCLUDED."age", "location"=EXCLUDED."location";'
+        )
         assert snipp.as_string(conn) == compare
 
         conn.close()
@@ -60,7 +71,11 @@ def test_update_snip():
             keys=["name", "Date(ts)"],
         )
 
-        compare = 'UPDATE "mytable" SET "name"=%(name)s, "age"=%(age)s, "location"=%(location)s WHERE "name"=%(name)s AND DATE("ts")=%(ts)s'
+        compare = (
+            'UPDATE "mytable" SET "name"=%(name)s, "age"=%(age)s,'
+            ' "location"=%(location)s WHERE "name"=%(name)s AND "ts"::DATE=%(ts)s::DATE;'
+        )
+
         assert snipp.as_string(conn) == compare
 
         conn.close()

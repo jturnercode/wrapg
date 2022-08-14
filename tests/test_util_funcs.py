@@ -1,5 +1,6 @@
 from wrapg import util
 
+
 # Note: run test using -m flag
 # pipenv run python -m pytest -vv
 
@@ -16,20 +17,21 @@ def test_uniform_dict_keys():
         {"num": 30, "data": "thirty", "bike": "brown", "name": "pete"},
         {"num": 60, "data": "sixty", "bike": "green", "name": "joe"},
         {"num": 80, "data": "eighty", "bike": "red", "name": "burt"},
-        {"num": 90, "data": "ninety", "bike": "candy red", "name": "sr"},
+        # note order should not matter
+        {"num": 90, "bike": "candy red", "name": "sr", "data": "ninety"},
     )
     assert util.uniform_dict_keys(data1) != 1
     assert util.uniform_dict_keys(data2) == 1
 
 
 def test_check_all_dicts():
-    not_uniform = (
+    not_alldicts = (
         {"num": 30, "data": "thirty", "bike": "brown", "name": "Pete"},
         {"num": 80, "data": "eighty", "name": "Red"},
         (1, 2, 3),
     )
 
-    uniform = (
+    all_dicts = (
         {"num": 30, "data": "thirty", "bike": "brown", "name": "Matthew"},
         {"num": 80, "bike": "Red", "name": "Ethan", "data": "eighty"},
     )
@@ -37,8 +39,8 @@ def test_check_all_dicts():
     # data_transform() returns (column names, )
     # test returned columns
     # TODO: How do i check BaseException?
-    # assert util.check_all_dicts(not_uniform) == 'BaseException: Iterable has mixed types, expected Iterable[dictionaries]'
-    assert util.check_all_dicts(uniform) is True
+    # assert util.check_all_dicts(not_alldicts) == 'BaseException: Iterable has mixed types, expected Iterable[dictionaries]'
+    assert util.check_all_dicts(all_dicts) is True
 
 
 def test_data_transform():
