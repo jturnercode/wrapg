@@ -28,7 +28,7 @@ conn_import: dict = {
 }
 
 
-def query(raw_sql: str, to_df=False, conn_kwargs: dict = None):
+def query(raw_sql: str, to_df: bool = False, conn_kwargs: dict = None):
     """Function to send raw sql query to postgres db.
 
     Args:
@@ -133,8 +133,6 @@ def insert(data: Iterable[dict] | pd.DataFrame, table: str, conn_kwargs: dict = 
                 return rw_count
 
 
-
-
 def insert_ignore(
     data: Iterable[dict] | pd.DataFrame,
     table: str,
@@ -190,6 +188,9 @@ def insert_ignore(
                     # print(qry.as_string(conn))
                     cur.executemany(query=qry, params_seq=rows)
 
+                    # TODO: add return count and test for all cases
+                    # return cur.rowcount
+
                 else:
                     for row in rows:
                         # get sql qry based on passed parameters for each row
@@ -242,7 +243,8 @@ def insert_ignore(
 def upsert(
     data: Iterable[dict] | pd.DataFrame,
     table: str,
-    keys: list,
+    keys: Iterable,
+    exclude_update: Iterable = None,
     use_index: bool = True,
     conn_kwargs: dict = None,
 ):
@@ -255,8 +257,9 @@ def upsert(
     Args:
         data (Iterable[dict] | pd.DataFrame): data in form of dict, list of dict, or dataframe
         table (str): name of database table
-        keys (list): Iterable of column names
-        use_index (bool): If False first try to update then insert without use of an index
+        keys (Iterable): column names used to filter & match records; synonymous with sql WHERE
+        use_index (bool): if False first try to update then insert without use of an index.
+        exclude_update (Iterable): exclude columns from updating database
         conn_kwargs (dict, optional): Specify/overide conn kwargs. See full list of options,
         https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-PARAMKEYWORDS.
         Defaults to None, recommend importing via .env file.
@@ -292,7 +295,10 @@ def upsert(
                     # Process uniform data
                     if uniform == 1:
                         qry = snippet.upsert_snip(
-                            table=table, columns=columns, keys=keys
+                            table=table,
+                            columns=columns,
+                            keys=keys,
+                            exclude_update=exclude_update,
                         )
                         # print(qry.as_string(conn))
                         cur.executemany(query=qry, params_seq=rows)
@@ -304,7 +310,10 @@ def upsert(
                         for row in rows:
                             # Note tupe(row) returns column keys for each record
                             qry = snippet.upsert_snip(
-                                table=table, columns=tuple(row), keys=keys
+                                table=table,
+                                columns=tuple(row),
+                                keys=keys,
+                                exclude_update=exclude_update,
                             )
                             # print(qry.as_string(conn))
                             cur.execute(query=qry, params=row)
@@ -328,7 +337,10 @@ def upsert(
                         # Process Uniform data
                         if uniform == 1:
                             qry = snippet.upsert_snip(
-                                table=table, columns=columns, keys=keys
+                                table=table,
+                                columns=columns,
+                                keys=keys,
+                                exclude_update=exclude_update,
                             )
                             # print(qry.as_string(conn))
                             cur.executemany(query=qry, params_seq=rows)
@@ -340,7 +352,10 @@ def upsert(
                             for row in rows:
                                 # Note tupe(row) returns column keys for each record
                                 qry = snippet.upsert_snip(
-                                    table=table, columns=tuple(row), keys=keys
+                                    table=table,
+                                    columns=tuple(row),
+                                    keys=keys,
+                                    exclude_update=exclude_update,
                                 )
                                 # print(qry.as_string(conn))
                                 cur.execute(query=qry, params=row)
@@ -368,7 +383,10 @@ def upsert(
 
                     # Update qry for uniform data
                     update_qry = snippet.update_snip(
-                        table=table, columns=columns, keys=keys
+                        table=table,
+                        columns=columns,
+                        keys=keys,
+                        exclude_update=exclude_update,
                     )
                     cur.executemany(query=update_qry, params_seq=rows)
 
@@ -411,7 +429,10 @@ def upsert(
                     for row in rows:
                         # Update qry for uniform data
                         update_qry = snippet.update_snip(
-                            table=table, columns=tuple(row), keys=keys
+                            table=table,
+                            columns=tuple(row),
+                            keys=keys,
+                            exclude_update=exclude_update,
                         )
                         # print(update_qry.as_string(conn))
                         cur.execute(query=update_qry, params=row)
@@ -421,7 +442,9 @@ def upsert(
                         if cur.rowcount == 0:
 
                             # Dynamic insert query for dictionaries
-                            insert_qry = snippet.insert_snip(table=table, columns=tuple(row))
+                            insert_qry = snippet.insert_snip(
+                                table=table, columns=tuple(row)
+                            )
                             cur.execute(query=insert_qry, params=row)
 
                             rw_count += cur.rowcount
@@ -433,6 +456,7 @@ def update(
     data: list[dict] | pd.DataFrame,
     table: str,
     keys: Iterable,
+    exclude_update: Iterable = None,
     conn_kwargs: dict = None,
 ) -> int:
     """Function for SQL's UPDATE
@@ -444,7 +468,8 @@ def update(
     Args:
         data (list[dict] | pd.DataFrame): data in form of dict, list of dict, or dataframe
         table (str): name of database table
-        keys (Iterable): Iterable of column names synonymous with sql WHERE
+        keys (Iterable): column names used to filter & match records; synonymous with sql WHERE
+        exclude_update (Iterable): exclude columns from updating database
         conn_kwargs (dict, optional): Specify/overide conn kwargs. See full list of options,
         https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-PARAMKEYWORDS.
         Defaults to None, recommend importing via .env file.
@@ -481,7 +506,12 @@ def update(
 
             if uniform == 1:
                 # print("> Uniform Data..")
-                qry = snippet.update_snip(table=table, columns=columns, keys=keys)
+                qry = snippet.update_snip(
+                    table=table,
+                    columns=columns,
+                    keys=keys,
+                    exclude_update=exclude_update,
+                )
                 print(qry.as_string(conn))
                 cur.executemany(query=qry, params_seq=rows)
 
@@ -493,10 +523,13 @@ def update(
                 rwcount = 0
                 for row in rows:
                     qry = snippet.update_snip(
-                        table=table, columns=tuple(row), keys=keys
+                        table=table,
+                        columns=tuple(row),
+                        keys=keys,
+                        exclude_update=exclude_update,
                     )
 
-                    print(qry.as_string(conn))  
+                    print(qry.as_string(conn))
                     cur.execute(query=qry, params=row)
                     rwcount += cur.rowcount
 

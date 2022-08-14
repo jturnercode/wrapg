@@ -62,7 +62,7 @@ Any connection variable can be overwritten in each function call if needed per [
 Below will overide connection dbname for specific function call.
 ```
 qry="SELECT * FROM customer" 
-wrapg.query(raw_sql=qry, conn_kwargs: {'dbname': 'anotherdb'})
+wrapg.query(raw_sql=qry, conn_kwargs={'dbname': 'anotherdb'})
 
 ```
 
@@ -89,7 +89,7 @@ This project built on great work by [psycopg 3](https://www.psycopg.org/psycopg3
 
 
 ## Contact
-Created by [_jturnercode_](https://github.com/jturnercode) - hope package is helps.
+Wrapped by [_jturnercode_](https://github.com/jturnercode)
 
 
 ## License

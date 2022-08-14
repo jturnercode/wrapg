@@ -147,3 +147,17 @@ def data_transform(data_structure):
 
         case _:
             raise ValueError(f"Unsupported data structure passed.")
+
+
+
+def iterable_difference(minuend: Iterable, subtrahend: Iterable) -> tuple:
+    """Used to get the difference between two iterables or sequences.
+    ie minuend - subtrahend = difference
+
+    Args:
+        minuend (Iterable): _description_
+        subtrahend (Iterable): _description_
+    """
+
+
+    return tuple(m for m in minuend if m not in subtrahend)

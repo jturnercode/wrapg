@@ -1,5 +1,17 @@
 # Release History
 
+
+0.2.3 (2022-08-14)
+-------------------
+**Improvements**
+- Add more tests for wrapg functions
+- Add exclude_update parameter to update() and upsert() functions
+
+**Bugfixes**
+- Fix colname_snip() to properly cast types if date() passed; it was affecting upsert with index=False
+- Fixed exisitng snippet tests due to type casting issue on colname_snip()
+
+
 0.2.2 (2022-05-07)
 -------------------
 **Improvements**
