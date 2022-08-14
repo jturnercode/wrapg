@@ -1,6 +1,8 @@
 import re
 from typing import Iterable
 from psycopg import sql, connect
+from util import iterable_difference
+
 
 # TODO: today use date() to type cast; change regex to '::' for type cast vs '()' for true funcs
 # Regex to seperate sql_func from column name
@@ -23,9 +25,12 @@ def check_for_func(sequence: Iterable) -> bool:
         bool: True if function found
     """
     # make all elements strings
-    it = map(str, sequence)
-    combined = "".join(it)
-    return "(" in combined
+    seq_of_str = map(str, sequence)
+    # combine seq of str into one long str
+    combined_seq = "".join(seq_of_str)
+
+    # return true or false
+    return "(" in combined_seq
 
 
 def colname_snip(sqlfunc_colname: tuple):
@@ -48,9 +53,15 @@ def colname_snip(sqlfunc_colname: tuple):
             sql.Identifier(colname),
         )
 
-    return sql.SQL("{}({})").format(
-        sql.SQL(sqlfunc),
+    # Returns sql func format; Keep for later use for true functions
+    # return sql.SQL("{}({})").format(
+    #     sql.SQL(sqlfunc),
+    #     sql.Identifier(colname),
+    # )
+
+    return sql.SQL("{}::{}").format(
         sql.Identifier(colname),
+        sql.SQL(sqlfunc),
     )
 
 
@@ -60,7 +71,7 @@ def colname_snip(sqlfunc_colname: tuple):
 def create_unique_index(table, keys):
 
     # Note name will include parenthsis if passed
-    # unique index name
+    # in unique index name
     uix_name = f'{table}_{"_".join(keys)}_uix'
 
     # If sql function in the any key
@@ -94,7 +105,15 @@ def exclude_sql(col):
     )
 
 
-def upsert_snip(table: str, columns: Iterable, keys: Iterable):
+def upsert_snip(
+    table: str, columns: Iterable, keys: Iterable, exclude_update: Iterable = None
+):
+
+    update_columns = columns
+
+    # if exclude columns from update then determine update_columns
+    if exclude_update:
+        update_columns = iterable_difference(columns, exclude_update)
 
     # if sql function in the any key
     if check_for_func(keys):
@@ -112,7 +131,7 @@ def upsert_snip(table: str, columns: Iterable, keys: Iterable):
             # conflict target
             sql.SQL(", ").join(map(colname_snip, sqlfunc_keys)),
             # set new values
-            sql.SQL(", ").join(map(exclude_sql, columns)),
+            sql.SQL(", ").join(map(exclude_sql, update_columns)),
         )
 
     # Sql snippet to upsert
@@ -125,7 +144,7 @@ def upsert_snip(table: str, columns: Iterable, keys: Iterable):
         # conflict target
         sql.SQL(", ").join(map(sql.Identifier, keys)),
         # set new values
-        sql.SQL(", ").join(map(exclude_sql, columns)),
+        sql.SQL(", ").join(map(exclude_sql, update_columns)),
     )
 
 
@@ -280,12 +299,14 @@ def get_sqlfunc_colname(colname: str):
 
 
 # function used to map passed dictionary values to column names
+# TODO: Truly distinguish between sql func and type cast; limited use today
 def colname_placeholder_snip(sqlfunc_colname: tuple):
 
-    """Return sql snip for where and set clauses with
-    placeholder for value;
+    """
+    Return sql snip for where and set clauses with
+    named placeholder for value;
     ex. "SET col=value, col2=value2
-    colname=%(colname)s or sqlfun(colname)=%(colname)s
+    colname=%(colname)s or sqlfunc(colname)=%(colname)s
 
     Args:
         sqlfunc_colname (tuple): (sqlfunc, colname)
@@ -293,13 +314,16 @@ def colname_placeholder_snip(sqlfunc_colname: tuple):
     Returns:
         Composable: colname=%(colname)s
     """
+    # unpack sqlfunc_colname to determine colname placeholder syntax
     sqlfunc, colname = sqlfunc_colname
+    
     if sqlfunc is None:
         return sql.SQL("{}={}").format(
             sql.Identifier(colname),
             sql.Placeholder(colname),
         )
-    # KEEP FOR NOW IN CASE WANT TO PROCESS TRUE FUNCTIONS VS TYPE CAST FUNCTIONS
+
+    # NOTE: KEEP FOR NOW IN CASE WANT TO PROCESS TRUE FUNCTIONS VS TYPE CAST FUNCTIONS
     # return sql.SQL("{}({})={}").format(
     #     sql.SQL(sqlfunc),
     #     sql.Identifier(colname),
@@ -315,7 +339,14 @@ def colname_placeholder_snip(sqlfunc_colname: tuple):
     )
 
 
-def update_snip(table: str, columns: Iterable, keys: Iterable):
+def update_snip(
+    table: str, columns: Iterable, keys: Iterable, exclude_update: Iterable = None
+):
+
+    # if exclude columns from update then determine update_columns
+    if exclude_update:
+        columns = iterable_difference(columns, exclude_update)
+
     columns = map(get_sqlfunc_colname, columns)
     keys = map(get_sqlfunc_colname, keys)
 
@@ -325,13 +356,15 @@ def update_snip(table: str, columns: Iterable, keys: Iterable):
         sql.SQL(" AND ").join(map(colname_placeholder_snip, keys)),
     )
 
+
 def insert_snip(table: str, columns: Iterable):
 
     return sql.SQL("INSERT INTO {} ({}) VALUES ({})").format(
-                        sql.Identifier(table),
-                        sql.SQL(", ").join(map(sql.Identifier, columns)),
-                        sql.SQL(", ").join(map(sql.Placeholder, columns)),
-                    )
+        sql.Identifier(table),
+        sql.SQL(", ").join(map(sql.Identifier, columns)),
+        sql.SQL(", ").join(map(sql.Placeholder, columns)),
+    )
+
 
 if __name__ == "__main__":
     # dev testing, remove later
