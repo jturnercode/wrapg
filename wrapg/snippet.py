@@ -1,7 +1,7 @@
 import re
 from typing import Iterable
 from psycopg import sql, connect
-from util import iterable_difference
+from wrapg import util
 
 
 # TODO: today use date() to type cast; change regex to '::' for type cast vs '()' for true funcs
@@ -113,7 +113,7 @@ def upsert_snip(
 
     # if exclude columns from update then determine update_columns
     if exclude_update:
-        update_columns = iterable_difference(columns, exclude_update)
+        update_columns = util.iterable_difference(columns, exclude_update)
 
     # if sql function in the any key
     if check_for_func(keys):
@@ -345,7 +345,7 @@ def update_snip(
 
     # if exclude columns from update then determine update_columns
     if exclude_update:
-        columns = iterable_difference(columns, exclude_update)
+        columns = util.iterable_difference(columns, exclude_update)
 
     columns = map(get_sqlfunc_colname, columns)
     keys = map(get_sqlfunc_colname, keys)

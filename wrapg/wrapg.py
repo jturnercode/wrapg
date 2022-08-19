@@ -136,7 +136,7 @@ def insert(data: Iterable[dict] | pd.DataFrame, table: str, conn_kwargs: dict = 
 def insert_ignore(
     data: Iterable[dict] | pd.DataFrame,
     table: str,
-    keys: list,
+    keys: Iterable,
     conn_kwargs: dict = None,
 ):
     """Function for SQL's INSERT ON CONFLICT DO NOTHING
@@ -248,6 +248,7 @@ def upsert(
     use_index: bool = True,
     conn_kwargs: dict = None,
 ):
+# TODO: should we have auto_index for auto create index & use_index for determing if index should be used?
     """Function for SQL's INSERT ON CONFLICT DO UPDATE SET
 
     Add a row into specified table if the row with specified keys does not already exist.
@@ -462,8 +463,8 @@ def update(
     """Function for SQL's UPDATE
 
     If rows with matching keys exist, update row values.
-    The columns that do not appear in the 'data' retain their original values.
-    Make sure data has keys specified in function.
+    The columns/info that is not provided in the 'data' retain their original values.
+    keys parameter must be specified in function.
 
     Args:
         data (list[dict] | pd.DataFrame): data in form of dict, list of dict, or dataframe
