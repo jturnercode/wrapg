@@ -1,5 +1,10 @@
 # Release History
 
+0.2.4 (2022-08-19)
+-------------------
+**Bugfixes**
+- Fix snippet module refernce to iterable_difference. from wrapg import util vs from util import iterable_difference
+
 
 0.2.3 (2022-08-14)
 -------------------
