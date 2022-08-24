@@ -54,15 +54,16 @@ def colname_snip(sqlfunc_colname: tuple):
         )
 
     # Returns sql func format; Keep for later use for true functions
-    # return sql.SQL("{}({})").format(
-    #     sql.SQL(sqlfunc),
-    #     sql.Identifier(colname),
-    # )
-
-    return sql.SQL("{}::{}").format(
-        sql.Identifier(colname),
+    return sql.SQL("{}({})").format(
         sql.SQL(sqlfunc),
+        sql.Identifier(colname),
     )
+
+    # Returns sql type cast (::) syntax
+    # return sql.SQL("{}::{}").format(
+    #     sql.Identifier(colname),
+    #     sql.SQL(sqlfunc),
+    # )
 
 
 # =================== Unique Index Snippet ===================

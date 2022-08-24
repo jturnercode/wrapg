@@ -325,7 +325,7 @@ def upsert(
                 # TODO: Can i check if index exist rather than using error
                 except errors.InvalidColumnReference as e:
                     # print(">>> Error: ", e)
-                    # print(f"> Creating unique index for {keys}...")
+                    print(f"> Creating unique index for {keys}...")
                     # !Important, cannot attempt other operations after error unless rollback()
                     conn.rollback()
 
@@ -513,7 +513,7 @@ def update(
                     keys=keys,
                     exclude_update=exclude_update,
                 )
-                print(qry.as_string(conn))
+                # print(qry.as_string(conn))
                 cur.executemany(query=qry, params_seq=rows)
 
                 # Return # of updated records
@@ -530,7 +530,7 @@ def update(
                         exclude_update=exclude_update,
                     )
 
-                    print(qry.as_string(conn))
+                    # print(qry.as_string(conn))
                     cur.execute(query=qry, params=row)
                     rwcount += cur.rowcount
 
