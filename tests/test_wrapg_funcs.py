@@ -1,7 +1,8 @@
 import os
 from psycopg import connect
-from wrapg import wrapg
 from datetime import datetime
+from wrapg import wrapg
+import common
 
 
 # Note: to run pytests
@@ -21,18 +22,7 @@ from datetime import datetime
 #     "port": os.environ.get("PG_PORT"),
 # }
 
-table = "test3"
-
-
-def test_clear_table():
-
-    wrapg.clear_table(table=table)
-
-    qry = f"SELECT * FROM {table}"
-    result = wrapg.query(raw_sql=qry)
-
-    # check if clear_table(); no records
-    assert len(list(result)) == 0
+test_table = os.environ.get("TEST_TABLE")
 
 
 def test_insert():
@@ -48,191 +38,112 @@ def test_insert():
 
     data = [
         {
-            "num": 300,
-            "superhero": "Captian",
-            "bike": "Huffy",
+            "age": 4,
+            "superhero": "Captain America",
+            "bike": "Speed Bike",
             "name": "Ethan",
-            "ts": datetime(2022, 5, 5, 8, 0),
+            "ts": datetime(2022, 1, 1, 7, 0),
         },
         {
-            "num": 900,
+            "age": 33,
+            "bike": "Road Bike",
+            "name": "Matthew",
             "superhero": "Iron Man",
-            "bike": "Honda",
-            "name": "James",
-            "ts": datetime(2022, 1, 1, 1, 1),
+            "ts": datetime(2022, 4, 1, 7, 0),
         },
     ]
 
-    wrapg.insert(data=data, table=table)
+    wrapg.insert(data=data, table=test_table)
 
-    qry = f"SELECT * FROM {table} WHERE name='Ethan'"
+    qry = f"SELECT * FROM {test_table}"
     result = wrapg.query(raw_sql=qry)
-    record = list(result)[0]
-    del record["id"]
-    # print(record)
+    records = list(result)
+    # print(records)
 
     # check insert()
-    assert record == {
-        "num": 300,
-        "superhero": "Captian",
-        "bike": "Huffy",
-        "name": "Ethan",
-        "ts": datetime(2022, 5, 5, 8, 0),
-    }
-
-
-def test_upsert_noindex():
-
-    # ================================================
-    #              Upsert() no index
-    #
-    # - uses sql type case function in key
-    # - test checks if Ethan record is UPDATED to 'Captain America'
-    # - test checks if Matthew record is INSERTED
-    # ================================================
-
-    data = [
-        {
-            "num": 300,
-            "superhero": "Captain America",
-            "bike": "Huffy",
-            "name": "Ethan",
-            "ts": datetime(2022, 5, 5, 9, 0),
-        },
-        {
-            "num": 200,
-            "bike": "BMX",
-            "name": "Matthew",
-            "superhero": "Spider-man",
-            "ts": datetime(2022, 8, 15, 13, 0),
-        },
-    ]
-
-    # upsert data
-    wrapg.upsert(data=data, table=table, keys=["Date(ts)"], use_index=False)
-
-    # check updated ethan record
-    qry = f"SELECT * FROM {table} WHERE name='Ethan'"
-    result = wrapg.query(raw_sql=qry)
-    record = list(result)[0]
-
-    # check update in upsert()
-    assert record["superhero"] == "Captain America"
-
-    # check inserted matthew record
-    qry = f"SELECT * FROM {table} WHERE name='Matthew'"
-    result = wrapg.query(raw_sql=qry)
-    record = list(result)[0]
-
-    # check insert in upsert()
-    assert record["superhero"] == "Spider-man"
-
-
-def test_upsert_index():
-
-    # ================================================
-    #              Upsert() with index
-    #
-    # - uses sql type case function in key
-    # - test checks if James record is UPDATED
-    # - test checks if Janie record is INSERTED
-    # ================================================
-
-    data = [
-        {
-            "num": 700,
-            "superhero": "Hulk",
-            "bike": "Honda CBR",
-            "name": "James",
-            "ts": datetime(2022, 7, 7, 7, 7),
-        },
-        {
-            "num": 500,
-            "bike": "Speed Bike",
-            "name": "Janie",
-            "superhero": "Black Widow",
-            "ts": datetime(2022, 2, 14, 14, 14),
-        },
-    ]
-
-    # upsert data
-    wrapg.upsert(data=data, table=table, keys=["name"], use_index=True)
-
-    # check updated james record
-    qry = f"SELECT * FROM {table} WHERE name='James'"
-    result = wrapg.query(raw_sql=qry)
-    james_record = list(result)[0]
-    del james_record["id"]
-
-    # check update in upsert()
-    assert james_record == data[0]
-
-    # check inserted janie record
-    qry = f"SELECT * FROM {table} WHERE name='Janie'"
-    result = wrapg.query(raw_sql=qry)
-    janie_record = list(result)[0]
-    del janie_record['id']
-    # check insert in upsert()
-    assert janie_record == data[1]
+    assert records == data
 
 
 def test_update():
 
     # ================================================
     #              Update()
-    #
+
     # - uses sql type case function in key
     # - test checks if all data is updated
     # ================================================
 
     ethan_data = {
-        "num": 333,
-        "superhero": "Captain America",
-        "bike": "Mountain",
+        "age": 5,
+        "superhero": "Bumble Bee",
+        "bike": "Mountain Bike",
         "name": "Ethan",
-        "ts": datetime(2022, 5, 5, 5, 5),
+        "ts": datetime(2022, 1, 1, 10, 0),
     }
 
     # Update() with sql type cast function
-    wrapg.update(data=ethan_data, table=table, keys=["Date(ts)"])
+    wrapg.update(data=ethan_data, table=test_table, keys=["Date(ts)"])
 
-    qry = f"SELECT * FROM {table} WHERE name='Ethan'"
+    # query updated ethan record
+    qry = f"SELECT * FROM {test_table} WHERE name='Ethan'"
     result = wrapg.query(raw_sql=qry)
     record = list(result)[0]
-    del record["id"]
 
-    # check update in upsert()
+    # check updated ethan record
     assert record == ethan_data
 
+
+def test_update_exclude():
     # ================================================
     #      Update() with exclude_data parameter
     #
-    # - uses sql type case function in key
-    # - num updated with new value while ts & superhero
+    # - uses sql date() to type cast function in key
+    # - age updated with new value while ts & superhero
     #   should not update
     # ================================================
 
     matthew_data = {
-        "num": 222,
-        "bike": "BMX",
+        "age": 3,
+        "bike": "Road Bike",
         "name": "Matthew",
         "superhero": "Gold Spider",
-        "ts": datetime(2022, 8, 15, 16, 16),
+        "ts": datetime(2022, 4, 1, 10, 0),
     }
 
     # Update() with exclude_update
     wrapg.update(
         data=matthew_data,
-        table=table,
+        table=test_table,
         keys=["Date(ts)"],
-        exclude_update=["ts", "superhero"],
+        exclude_update=["ts", "age"],
     )
 
-    # retrieve updated record
-    qry = f"SELECT * FROM {table} WHERE name='Matthew'"
+    # retrieve updated mathew record
+    qry = f"SELECT * FROM {test_table} WHERE name='Matthew'"
     result = wrapg.query(raw_sql=qry)
     record = list(result)[0]
 
-    # check insert in upsert()
-    assert record["superhero"] == "Spider-man"
-    assert record["num"] == 222
+    # check updated matthew record
+    assert record["superhero"] == "Gold Spider"
+
+    # Info Should not update
+    assert record["age"] == 33
+    assert record["ts"] == datetime(2022, 4, 1, 7, 0)
+
+
+def test_clear_table():
+
+    qry = f"SELECT * FROM {test_table}"
+    result = wrapg.query(raw_sql=qry)
+
+    if list(result):
+        wrapg.clear_table(table=test_table)
+
+        qry = f"SELECT * FROM {test_table}"
+        result = wrapg.query(raw_sql=qry)
+
+        # check if clear_table(); no records
+        assert len(list(result)) == 0
+
+    else:
+        raise Exception("No records to run clear table on")
