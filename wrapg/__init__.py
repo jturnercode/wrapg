@@ -11,4 +11,5 @@ from wrapg.wrapg import (
     insert_ignore,
     delete,
     clear_table,
+    create_database,
 )
