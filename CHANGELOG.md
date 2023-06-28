@@ -6,7 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.2.5] - 2022-08-xx
+## [0.2.6] - 2023-06-27
+-------------------
+### Added
+- Added create_database() function
+
+
+## [0.2.5] - 2022-08-23
 -------------------
 ### Added
 - Added common.py in tests

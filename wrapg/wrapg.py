@@ -55,7 +55,6 @@ def query(raw_sql: str, to_df: bool = False, conn_kwargs: dict = None):
     with psycopg.connect(**conn_final) as conn:
         # Open a cursor to perform database operations
         with conn.cursor() as cur:
-
             # Pass raw_sql to execute()
             # example: cur.execute("SELECT * FROM tablename WHERE id = 4")
             cur.execute(query=raw_sql)
@@ -76,7 +75,6 @@ def query(raw_sql: str, to_df: bool = False, conn_kwargs: dict = None):
 
 
 def insert(data: Iterable[dict] | pd.DataFrame, table: str, conn_kwargs: dict = None):
-
     """Function for SQL's INSERT
 
     Add a row(s) into specified table
@@ -101,10 +99,8 @@ def insert(data: Iterable[dict] | pd.DataFrame, table: str, conn_kwargs: dict = 
 
     # Connect to an existing database
     with psycopg.connect(**conn_final) as conn:
-
         # Open a cursor to perform database operations
         with conn.cursor() as cur:
-
             # Typ insert statement format
             # INSERT INTO table (col1, col2) VALUES (300, "vehicles");
 
@@ -168,10 +164,8 @@ def insert_ignore(
 
     # Connect to an existing database
     with psycopg.connect(**conn_final) as conn:
-
         # Open a cursor to perform database operations
         with conn.cursor() as cur:
-
             # =================== Ignore_Insert Qry ==================
             # INSERT INTO table (name, email)
             # VALUES('Dave','dave@yahoo.com')
@@ -248,7 +242,7 @@ def upsert(
     use_index: bool = True,
     conn_kwargs: dict = None,
 ):
-# TODO: should we have auto_index for auto create index & use_index for determing if index should be used?
+    # TODO: should we have auto_index for auto create index & use_index for determing if index should be used?
     """Function for SQL's INSERT ON CONFLICT DO UPDATE SET
 
     Add a row into specified table if the row with specified keys does not already exist.
@@ -280,10 +274,8 @@ def upsert(
 
     # Connect to an existing database
     with psycopg.connect(**conn_final) as conn:
-
         # Open a cursor to perform database operations
         with conn.cursor() as cur:
-
             # =================== Upsert Qry ==================
             # INSERT INTO table (name, email)
             # VALUES('Dave','dave@yahoo.com')
@@ -374,14 +366,12 @@ def upsert(
                     quit()
 
             if use_index is False:
-
                 # If use_index is False
                 # First attempt to update data, confirm result
                 # If no update, then insert record
 
                 # Process uniform data without index
                 if uniform == 1:
-
                     # Update qry for uniform data
                     update_qry = snippet.update_snip(
                         table=table,
@@ -441,7 +431,6 @@ def upsert(
 
                         # if no update then insert record
                         if cur.rowcount == 0:
-
                             # Dynamic insert query for dictionaries
                             insert_qry = snippet.insert_snip(
                                 table=table, columns=tuple(row)
@@ -493,10 +482,8 @@ def update(
 
     # Connect to an existing database
     with psycopg.connect(**conn_final) as conn:
-
         # Open a cursor to perform database operations
         with conn.cursor() as cur:
-
             # =================== Update Qry ===================
             # UPDATE table_name
             # SET column1 = value1,
@@ -569,7 +556,6 @@ def create_table(table: str, columns: dict, conn_kwargs: dict = None):
     with psycopg.connect(**conn_final) as conn:
         # Open a cursor to perform database operations
         with conn.cursor() as cur:
-
             # TODO: Add optional table constriants to function
             # =================== Create Table Qry ===================
             # CREATE TABLE [IF NOT EXISTS] table_name (
@@ -588,6 +574,7 @@ def create_table(table: str, columns: dict, conn_kwargs: dict = None):
                 Args:
                     column_pairs (Iterable): column names
                 """
+
                 # function used to map to column names
                 def col_sql(col, value):
                     # return sql.SQL(f'"{col}" {value.upper()}')
@@ -601,6 +588,52 @@ def create_table(table: str, columns: dict, conn_kwargs: dict = None):
                 sql.Identifier(table),
                 sql.SQL(", ").join(define_column(columns)),
             )
+            # print(qry.as_string(conn))
+
+            cur.execute(query=qry)
+
+            # Make the changes to the database persistent
+            conn.commit()
+
+
+def create_database(name: str, conn_kwargs: dict = None):
+    """Function creating database.
+
+    Args:
+        name (str): name of database
+        conn_kwargs (dict, optional): Specify/overide conn kwargs. See full list of options,
+        https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-PARAMKEYWORDS.
+        Defaults to None, recommend importing via .env file.
+
+    Example:
+        create_table(name="mydb")
+
+    Returns:
+        _type_: None
+    """
+
+    # Initialize conn_kwargs to empty dict if no arguments passed
+    # Merge args into conn_final
+    if conn_kwargs is None:
+        conn_kwargs = {}
+
+    # Final connection args to pass to connect()
+    # Set default return type (row factory) to dictionary, can be overwritten with kwargs
+    # dbname must equal None for connection string, db does not exist yet
+    conn_final = {**conn_import, **conn_kwargs, **{"dbname": None}}
+
+    # Connect to an existing database
+    with psycopg.connect(**conn_final) as conn:
+        # required for create database
+        conn.autocommit = True
+
+        # Open a cursor to perform database operations
+        with conn.cursor() as cur:
+            # TODO: Add optional table constriants to function
+            # =================== Create Table Qry ===================
+            # CREATE DATABASE db_name;
+
+            qry = sql.SQL("CREATE DATABASE {};").format(sql.Identifier(name))
             # print(qry.as_string(conn))
 
             cur.execute(query=qry)
@@ -646,7 +679,6 @@ def copy_from_csv(
     with psycopg.connect(**conn_final) as conn:
         # Open a cursor to perform database operations
         with conn.cursor() as cur:
-
             #! SPECIFIC COLUMNS NOT WORKING; Open ticket with pyscopg?
             # =================== Copy Qry ===================
             # "COPY cust (name, age) FROM STDIN WITH (FORMAT csv)"
@@ -669,7 +701,6 @@ def copy_from_csv(
                 # https://www.postgresql.org/docs/current/sql-copy.html
 
                 with cur.copy(copy_sql) as copy:
-
                     # Using blocks/chunks
                     while data := f.read(block_size):
                         copy.write(data)
@@ -710,10 +741,8 @@ def delete(table: str, where: dict, conn_kwargs: dict = None):
 
     # Connect to an existing database
     with psycopg.connect(**conn_final) as conn:
-
         # Open a cursor to perform database operations
         with conn.cursor() as cur:
-
             # =================== Delete Qry ===================
             # DELETE FROM table_name
             # WHERE condition---> id = 7 and badge in (2,4)
@@ -750,10 +779,8 @@ def clear_table(table: str, conn_kwargs: dict = None):
 
     # Connect to an existing database
     with psycopg.connect(**conn_final) as conn:
-
         # Open a cursor to perform database operations
         with conn.cursor() as cur:
-
             # =================== Delete ALL Records Qry ===================
             # DELETE FROM table_name;
 

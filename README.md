@@ -63,9 +63,16 @@ qry="SELECT * FROM customers"
 wrapg.query(raw_sql=qry, conn_kwargs={'dbname': 'sales'})
 
 ```
+### Create Database
+Function to help create database.
+(note: PG_DBNAME will be silenced in connection string)
+
+```
+wrapg.create_table(name="supers")
+```
 
 ### Create Table
-Function to help create table from python.
+Function to help create table.
 
 ```
 cols = dict(id="serial", name="varchar(75) unique not null", age="int")
