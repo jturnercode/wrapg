@@ -8,6 +8,7 @@
 *.columns
 *.url
 *.db
+*.sql
 main.py
 working.py
 Pipfile.lock
