@@ -20,11 +20,11 @@ from wrapg import util, snippet
 # TODO: Add proper exceptions if parameters are missing or do not work
 # TODO: Expose conn_import in init.py as class to easily modify attributes?? vs dict?
 conn_import: dict = {
-    "user": os.environ.get("PG_USER"),
-    "password": os.environ.get("PG_PASSWORD"),
-    "host": os.environ.get("PG_HOST"),
-    "dbname": os.environ.get("PG_DBNAME"),
-    "port": os.environ.get("PG_PORT"),
+    "user": os.environ.get("user"),
+    "password": os.environ.get("password"),
+    "host": os.environ.get("host"),
+    "dbname": os.environ.get("dbname"),
+    "port": os.environ.get("port"),
 }
 
 
@@ -39,7 +39,7 @@ def query(raw_sql: str, to_df: bool = False, conn_kwargs: dict = None):
         Defaults to None, recommend importing via .env file.
 
     Returns:
-        _type_: iterator or Dataframe
+        _type_: iterator[dict] or Dataframe
     """
 
     # Initialize conn_kwargs to empty dict if no arguments passed
@@ -74,7 +74,9 @@ def query(raw_sql: str, to_df: bool = False, conn_kwargs: dict = None):
                 return iter(cur.fetchall())
 
 
-def insert(data: Iterable[dict] | pd.DataFrame, table: str, conn_kwargs: dict = None):
+def insert(
+    data: Iterable[dict] | pd.DataFrame, table: str, conn_kwargs: dict = None
+) -> int:
     """Function for SQL's INSERT
 
     Add a row(s) into specified table
@@ -85,6 +87,9 @@ def insert(data: Iterable[dict] | pd.DataFrame, table: str, conn_kwargs: dict = 
         conn_kwargs (dict, optional): Specify/overide conn kwargs. See full list of options,
         https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-PARAMKEYWORDS.
         Defaults to None, recommend importing via .env file.
+
+    Returns:
+        int: # of inserted records
     """
 
     columns, rows, uniform = util.data_transform(data)
@@ -241,7 +246,7 @@ def upsert(
     exclude_update: Iterable = None,
     use_index: bool = True,
     conn_kwargs: dict = None,
-):
+) -> int:
     # TODO: should we have auto_index for auto create index & use_index for determing if index should be used?
     """Function for SQL's INSERT ON CONFLICT DO UPDATE SET
 
@@ -258,6 +263,9 @@ def upsert(
         conn_kwargs (dict, optional): Specify/overide conn kwargs. See full list of options,
         https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-PARAMKEYWORDS.
         Defaults to None, recommend importing via .env file.
+
+    Returns:
+        int: # of updated or inserted records
     """
 
     # Inspect data and return columns and rows
@@ -604,9 +612,10 @@ def create_database(name: str, conn_kwargs: dict = None):
         conn_kwargs (dict, optional): Specify/overide conn kwargs. See full list of options,
         https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-PARAMKEYWORDS.
         Defaults to None, recommend importing via .env file.
+        Note: dbname will be silenced in connection string if set via .env file.
 
     Example:
-        create_table(name="mydb")
+        create_database(name="new_db")
 
     Returns:
         _type_: None
@@ -648,7 +657,7 @@ def copy_from_csv(
     header: bool = False,
     block_size=50_000,
     conn_kwargs: dict = None,
-):
+) -> None:
     # TODO: Account for using other data from Iterable of sequence like list(tuples)
     # TODO: Can i return the number of copied rows per postgres standard
     # TODO: Auto create table based on csv, use pandas(chunk), translate data types
@@ -661,6 +670,9 @@ def copy_from_csv(
         conn_kwargs (dict, optional): Specify/overide conn kwargs. See full list of options,
         https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-PARAMKEYWORDS.
         Defaults to None, recommend importing via .env file.
+
+    Example:
+        copy_from_csv(table="heroes", csv_file='hero.csv', header=True)
 
     Returns:
         _type_: None
@@ -713,7 +725,7 @@ def copy_from_csv(
 
 
 # ================================= Delete_where Function ================================
-def delete(table: str, where: dict, conn_kwargs: dict = None):
+def delete(table: str, where: dict, conn_kwargs: dict = None) -> None:
     """Function for SQL's Delete.
 
     Delete rows from the specified table that match 'where' condition, column=value dictionary.
@@ -728,6 +740,12 @@ def delete(table: str, where: dict, conn_kwargs: dict = None):
         conn_kwargs (dict, optional): Specify/overide conn kwargs. See full list of options,
         https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-PARAMKEYWORDS.
         Defaults to None, recommend importing via .env file.
+
+    Example:
+        delete(table="heroes", where=dict(), header=True)
+
+    Returns:
+        _type_: None
     """
 
     # Initialize conn_kwargs to empty dict if no arguments passed
@@ -758,7 +776,7 @@ def delete(table: str, where: dict, conn_kwargs: dict = None):
 
 
 # ================================= Clear_table Function ================================
-def clear_table(table: str, conn_kwargs: dict = None):
+def clear_table(table: str, conn_kwargs: dict = None) -> None:
     """!!Caution!! Function for SQL's Delete used to delete 'ALL' records in specified table.
 
     Args:
