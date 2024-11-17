@@ -164,22 +164,36 @@ ORDER BY COUNT(alarm) DESC"
 wrapg.query(raw_sql=qry)
 ```
 
+```
+qry_with_params = "INSERT INTO some_table (id, created_at, updated_at, last_name)
+VALUES (%(id)s, %(created)s, %(created)s, %(name)s);"
+
+
+info = {'id': 10, 'name': "O'Reilly", 'created': datetime.date(2020, 11, 18)}
+
+wrapg.query(raw_sql=qry, params = info)
+
+```
+
 ## Todo
 
-- \*\*Create session instance to run mutliple function within same session; how will this affect conn_kwargs for operations on different dbs
-- \*\*handle env better without pipenv?
-- \*Return scalar from query function vs iter[dict]/df (apply to applicable funcs); return_type parameter?
-- \*Ability to pass iter[dict] to funcs like insert; read util functions
-- Table manupulation drop_column(), drop-table(), add_column(), delete_table()
-- Add copy to (data from table to file)
-- use polars? for better performance and memory managment
-- Add ability to convert column to ['identity'](https://www.postgresqltutorial.com/postgresql-tutorial/postgresql-identity-column/) column with start, increment attribute
-- insert_ignore() without index
-- Handle other operators other than '='; >, <, <>, in, between, like?
-- Implement create_index(), distinct(), drop_index()
-- Handle JSON, ITERATOR?
-- \*\*Add more tests
-- Optimize code after it is all working
+[x] Changed .env connection parameters to match postgres sql connection parameter names (11/16/24)
+[x] Add params parameter to .query() function; allows to pass named & un-named placeholders in queries (11/17/24)
+[ ] Add code to query() func to allow executemany() for Iterable[data]? what scenerio is this needed?
+[ ] \*\*Create session instance to run mutliple function within same session; how will this affect conn_kwargs for operations on different dbs
+[ ] \*\*handle env better without pipenv?
+[ ] \*Return scalar from query function vs iter[dict]/df (apply to applicable funcs); return_type parameter?
+[ ] \*Ability to pass iter[dict] to funcs like insert; read util functions
+[ ] Table manupulation drop_column(), drop-table(), add_column(), delete_table()
+[ ] Add copy to (data from table to file)
+[ ] use polars? for better performance and memory managment
+[ ] Add ability to convert column to ['identity'](https://www.postgresqltutorial.com/postgresql-tutorial/postgresql-identity-column/) column with start, increment attribute
+[ ] insert_ignore() without index
+[ ] Handle other operators other than '='; >, <, <>, in, between, like?
+[ ] Implement create_index(), distinct(), drop_index()
+[ ] Handle JSON, ITERATOR?
+[ ] \*\*Add more tests
+[ ] Optimize code after it is all working
 
 ## Acknowledgements
 

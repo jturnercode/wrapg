@@ -27,19 +27,28 @@ conn_import: dict = {
     "port": os.environ.get("port"),
 }
 
+# TODO: implement executemany for params inside query func
+# params: tuple | dict | Iterable[tuple | dict] = None,
 
-def query(raw_sql: str, to_df: bool = False, conn_kwargs: dict = None):
+
+def query(
+    raw_sql: str,
+    params: tuple | dict = None,
+    to_df: bool = False,
+    conn_kwargs: dict = None,
+):
     """Function to send raw sql query to postgres db.
 
     Args:
-        raw_sql (str): sql query in string form.
+        raw_sql (str): sql query in string form. named (%(name)s) or un-named (%s) placeholders are allowed.
+        params (tuple | dict) : data for named or un-named placeholders
         to_df (bool, optional): Return results of query in dataframe. Defaults to False.
         conn_kwargs (dict, optional): Specify/overide conn kwargs. See full list of options,
         https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-PARAMKEYWORDS.
         Defaults to None, recommend importing via .env file.
 
     Returns:
-        _type_: iterator[dict] or Dataframe
+        _type_: Iterator[dict] or Dataframe
     """
 
     # Initialize conn_kwargs to empty dict if no arguments passed
@@ -55,9 +64,10 @@ def query(raw_sql: str, to_df: bool = False, conn_kwargs: dict = None):
     with psycopg.connect(**conn_final) as conn:
         # Open a cursor to perform database operations
         with conn.cursor() as cur:
+
             # Pass raw_sql to execute()
             # example: cur.execute("SELECT * FROM tablename WHERE id = 4")
-            cur.execute(query=raw_sql)
+            cur.execute(query=raw_sql, params=params)
 
             # Used for testing output of raw_sql
             # print("rowcount: ", cur.rowcount)
