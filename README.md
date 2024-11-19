@@ -16,17 +16,19 @@ Project is in infancy, _work in progress_.
 
 ## Features
 
-- Simple python functions to run postgres sql via python. see Usage section for more details on list of functionality.
+- Simple python functions to run postgres sql via python. See [Usage](#usage) section for more details on list of functionality.
   - upsert & insert_ignore functions included
     - 'use_index=True' automatically creates index
     - 'use_index=False' to upsert without using index (slower)
-  - copy*from_csv() function to follow postgres COPY protocol *(today only csv is avail)\_
+  - copy_from_csv() function to follow postgres COPY protocol (today only csv is available)
 - Pass/Retrieve various python data structutes via underlining sql functions
-  - supports pandas dataframe out of box
+  - tuples
+  - dictionaires
+  - pandas dataframe
 - Auto import default postgres connection parameters via .env
   - saves on repeating code to specify connection
   - overide default connection parameters with kwargs in each function if needed
-- Use of sql functions with certain parametes. _(work in progress, today mosty use Date() to type cast in keys parameters)_
+- Use of postgres sql functions with certain parametes. _(work in progress, today mosty use Date() to type cast in keys parameters)_
 
 ## Installing Wrapg
 
@@ -44,11 +46,11 @@ Dependencies:
 
 ## Usage
 
-### Connection
+### Connection Parameters
 
-Before you get started is is recommended to create .env file in main project directory.  
-The .env file should contain below specific named variables that follow postgres connection parameter key words.
-Wrapg will auto-import the specified default connectionn parameters and make all functions ready to be executed.
+Before you get started is is recommended to create .env file in main project directory to store connection parameters.  
+Wrapg will read the .env file via pipenv (future: will remove need for pipenv) and set default connection parameters.  
+The .env file should contain below specific named variables that follow postgres connection parameter key words as shown below.
 
 ```
 # Database connection parameters
@@ -65,6 +67,7 @@ Below example shows how the default .env specified `dbname=supers` was changed t
 
 ```
 qry="SELECT * FROM customers"
+
 wrapg.query(raw_sql=qry, conn_kwargs={'dbname': 'sales'})
 
 ```
@@ -85,6 +88,7 @@ Function to help create table.
 
 ```
 cols = dict(id="serial PRIMARY KEY", name="varchar(75) unique not null", age="int")
+
 wrapg.create_table(table="villian", columns=cols)
 ```
 
@@ -109,6 +113,7 @@ Easily call sql update.
 
 ```
 new_email = {superhero: 'Spider-man', 'email': 'spidey@gmail.com'}
+
 wrapg.update(data=new_email, table="superhero", keys=["superhero"])
 ```
 
@@ -123,6 +128,7 @@ Easily call sql upsert.
 
 ```
 record = {'name': 'Steve Rogers', superhero: 'Captian America', 'email': 'cap@gmail.com'}
+
 wrapg.upsert(data=record, table="superhero", keys=["email"], use_index=True)
 ```
 
@@ -137,6 +143,7 @@ Easily call sql insert ignore.
 
 ```
 record = {'name': 'Dr Victor von Doom', villian: 'Dr Doom', 'email': 'doom@gmail.com'}
+
 wrapg.insert_ignore(data=record, table="villian", keys=["email"], use_index=True)
 ```
 
@@ -177,23 +184,22 @@ wrapg.query(raw_sql=qry, params = info)
 
 ## Todo
 
-[x] Changed .env connection parameters to match postgres sql connection parameter names (11/16/24)
-[x] Add params parameter to .query() function; allows to pass named & un-named placeholders in queries (11/17/24)
-[ ] Add code to query() func to allow executemany() for Iterable[data]? what scenerio is this needed?
-[ ] \*\*Create session instance to run mutliple function within same session; how will this affect conn_kwargs for operations on different dbs
-[ ] \*\*handle env better without pipenv?
-[ ] \*Return scalar from query function vs iter[dict]/df (apply to applicable funcs); return_type parameter?
-[ ] \*Ability to pass iter[dict] to funcs like insert; read util functions
-[ ] Table manupulation drop_column(), drop-table(), add_column(), delete_table()
-[ ] Add copy to (data from table to file)
-[ ] use polars? for better performance and memory managment
-[ ] Add ability to convert column to ['identity'](https://www.postgresqltutorial.com/postgresql-tutorial/postgresql-identity-column/) column with start, increment attribute
-[ ] insert_ignore() without index
-[ ] Handle other operators other than '='; >, <, <>, in, between, like?
-[ ] Implement create_index(), distinct(), drop_index()
-[ ] Handle JSON, ITERATOR?
+[x] Changed .env connection parameters to match postgres sql connection parameter names (11/16/24)  
+[x] Add params parameter to .query() function; allows to pass named & un-named placeholders in queries (11/17/24)  
+[ ] Add code to query() func to allow executemany() for Iterable[data]? what scenerio is this needed?  
+[ ] \*\*Create session instance to run mutliple function within same session; how will this affect conn_kwargs for operations on different dbs  
+[ ] \*\*handle env better without pipenv?  
+[ ] \*Return scalar from query function vs iter[dict]/df (apply to applicable funcs); return_type parameter?  
+[ ] \*Ability to pass iter[dict] to funcs like insert; read util functions  
+[ ] Table manupulation drop_column(), drop-table(), add_column(), delete_table()  
+[ ] Add copy to (data from table to file)  
+[ ] use polars? for better performance and memory managment  
+[ ] Add ability to convert column to ['identity'](https://www.postgresqltutorial.com/postgresql-tutorial/postgresql-identity-column/) column with start, increment attribute  
+[ ] insert_ignore() without index  
+[ ] Handle other operators other than '='; >, <, <>, in, between, like?  
+[ ] Implement create_index(), distinct(), drop_index()  
+[ ] Handle JSON, ITERATOR?  
 [ ] \*\*Add more tests
-[ ] Optimize code after it is all working
 
 ## Acknowledgements
 
